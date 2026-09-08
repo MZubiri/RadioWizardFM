@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#4c1d95">
+    <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
+    <link rel="manifest" href="/manifest.json">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="/css/style.css">
+
+    <title>WizardFM — Panel del Locutor 🎙️</title>
+    <style>
+      .dj-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 2rem 1.5rem 4rem;
+      }
+      .dj-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        margin-bottom: 2.5rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid var(--glass-border);
+      }
+      .dj-title h1 {
+        font-family: var(--font-display);
+        font-size: 2rem;
+        color: var(--text-primary);
+        letter-spacing: 1px;
+      }
+      .dj-title p {
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        margin-top: 0.25rem;
+      }
+      .dj-header-actions {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+      .dj-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+        gap: 2rem;
+      }
+      .dj-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(var(--glass-blur));
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-lg);
+        padding: 1.75rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+      }
+      .dj-card__title {
+        font-family: var(--font-display);
+        font-size: 1.2rem;
+        color: var(--gold-400);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .dj-status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.4rem 1rem;
+        border-radius: var(--radius-full);
+        font-size: 0.85rem;
+        font-weight: 700;
+        width: fit-content;
+      }
+      .dj-status-badge--autodj {
+        background: rgba(124, 58, 237, 0.2);
+        color: var(--purple-300);
+        border: 1px solid rgba(124, 58, 237, 0.4);
+      }
+      .dj-status-badge--live {
+        background: rgba(34, 197, 94, 0.2);
+        color: #4ade80;
+        border: 1px solid rgba(34, 197, 94, 0.5);
+        box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+      }
+      .dj-param-box {
+        background: rgba(10, 10, 26, 0.6);
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        border-radius: var(--radius-md);
+        padding: 1rem;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.75rem;
+        font-size: 0.9rem;
+      }
+      .dj-param-box strong {
+        color: var(--purple-300);
+      }
+      .dj-import-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      .dj-lechuzas {
+        max-height: 320px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+    </style>
+</head>
+<body>
+    <div id="particles" class="particles" aria-hidden="true"></div>
+
+    <div class="dj-container">
+        <header class="dj-header">
+            <div class="dj-title">
+                <h1>🧙‍♂️ Panel de Locutores <span style="color: var(--gold-400);">WizardFM</span></h1>
+                <p>Herramientas y parámetros de transmisión para magos al aire</p>
+            </div>
+            <div class="dj-header-actions">
+                <a href="/" class="btn btn--outline">⬅ Volver a la Radio</a>
+                <a href="https://panel.wizardfm.lat" target="_blank" rel="noopener" class="btn btn--primary">🎛️ Abrir AzuraCast Completo</a>
+            </div>
+        </header>
+
+        <div class="dj-grid">
+            <!-- Columna 1: Estado del Aire & Parámetros -->
+            <div style="display: flex; flex-direction: column; gap: 2rem;">
+                <!-- Estado en Vivo -->
+                <div class="dj-card">
+                    <h2 class="dj-card__title">📡 Estado del Aire</h2>
+                    <div id="dj-status-badge" class="dj-status-badge dj-status-badge--autodj">
+                        🔮 AUTO-DJ ENCANTADO
+                    </div>
+                    <div>
+                        <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Sonando Ahora</span>
+                        <h3 id="dj-track-title" style="font-size: 1.3rem; margin: 0.3rem 0; color: #fff;">Cargando...</h3>
+                        <p id="dj-track-artist" style="color: var(--purple-300); font-weight: 500;">---</p>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; color: var(--text-secondary); font-size: 0.95rem; border-top: 1px solid var(--glass-border); padding-top: 1rem;">
+                        <span style="font-size: 1.3rem;">🧙‍♂️</span>
+                        <strong id="dj-listeners" style="color: #fff; font-size: 1.2rem;">0</strong> oyentes sintonizando en vivo
+                    </div>
+                </div>
+
+                <!-- Parámetros BUTT / Mixxx -->
+                <div class="dj-card">
+                    <h2 class="dj-card__title">🎙️ Configuración BUTT / Mixxx</h2>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">
+                        Transmite desde tu laptop usando tu tarjeta de audio, micrófono y software como <strong>BUTT</strong> o <strong>Mixxx</strong>:
+                    </p>
+                    <div class="dj-param-box">
+                        <div><strong>Tipo de Servidor:</strong> Icecast 2</div>
+                        <div><strong>Servidor (Host):</strong> wizardfm.lat</div>
+                        <div><strong>Puerto:</strong> 8005</div>
+                        <div><strong>Punto de Montaje:</strong> /live</div>
+                        <div><strong>Usuario DJ:</strong> Tu usuario</div>
+                        <div><strong>Contraseña DJ:</strong> Tu clave</div>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #34d399; margin: 0; line-height: 1.4;">
+                        ✨ Al conectarte, AzuraCast realiza crossfade suave y atenúa el AutoDJ para que salgas al aire con el audio directo de tu tarjeta de sonido.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Columna 2: Importador & Lechuzas -->
+            <div style="display: flex; flex-direction: column; gap: 2rem;">
+                <!-- Importador Mágico -->
+                <div class="dj-card">
+                    <h2 class="dj-card__title">🪄 Importador Mágico de Música</h2>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">
+                        Pega un enlace de <strong>YouTube</strong> o <strong>Spotify</strong> para descargar e incorporar canciones a la biblioteca de AzuraCast automáticamente:
+                    </p>
+                    <form id="dj-import-form" class="dj-import-form">
+                        <input type="text" id="dj-import-url" class="chat__input" placeholder="Ej. https://www.youtube.com/watch?v=... o Spotify URL" required>
+                        <button type="submit" id="dj-import-submit" class="btn btn--primary" style="width: 100%;">
+                            Descargar e Importar a la Radio ✨
+                        </button>
+                    </form>
+                    <div id="dj-import-msg" style="font-size: 0.85rem; padding: 0.5rem; border-radius: var(--radius-sm); display: none;"></div>
+                </div>
+
+                <!-- Buzón de Lechuzas -->
+                <div class="dj-card">
+                    <h2 class="dj-card__title">🦉 Buzón de Lechuzas (Chat en Vivo)</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">
+                        Mensajes y pedidos de canciones de los oyentes en tiempo real:
+                    </p>
+                    <div id="dj-lechuzas" class="dj-lechuzas">
+                        <div style="text-align: center; color: var(--text-muted); padding: 2rem 0; font-size: 0.9rem;">
+                            Esperando mensajes de los oyentes... 🦉✨
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Socket.io -->
+    <script src="/socket.io/socket.io.js" onerror="this.onerror=null;this.src='https://cdn.socket.io/4.8.1/socket.io.min.js';"></script>
+    <script src="/js/dj.js"></script>
+</body>
+</html>

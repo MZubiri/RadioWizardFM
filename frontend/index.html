@@ -46,6 +46,7 @@
             <a href="#player" class="navbar__link">Escuchar</a>
             <a href="#shows" class="navbar__link">Shows</a>
             <a href="#about" class="navbar__link">Nosotros</a>
+            <a href="/dj.html" class="navbar__link">🎙️ Locutores</a>
             <button id="install-btn" class="btn btn--outline btn--sm" hidden>
                 <span class="btn__icon">📲</span> Instalar App
             </button>
@@ -58,8 +59,10 @@
     <!-- Mobile Menu -->
     <div id="mobile-menu" class="mobile-menu" hidden>
         <a href="#player" class="mobile-menu__link">🎧 Escuchar</a>
+        <a href="#chat" class="mobile-menu__link">💬 Chat</a>
         <a href="#shows" class="mobile-menu__link">📅 Shows</a>
         <a href="#about" class="mobile-menu__link">✨ Nosotros</a>
+        <a href="/dj.html" class="mobile-menu__link">🎙️ Panel de Locutores</a>
         <button id="install-btn-mobile" class="btn btn--primary btn--full" hidden>📲 Instalar App</button>
     </div>
 
@@ -159,7 +162,15 @@
 
                 <!-- Join Form -->
                 <form id="chat-join" class="chat__join">
-                    <input type="text" id="chat-nickname" class="chat__input" placeholder="Tu nombre mágico..." maxlength="20" autocomplete="off">
+                    <div class="chat__join-inputs">
+                        <input type="text" id="chat-nickname" class="chat__input" placeholder="Tu nombre mágico..." maxlength="20" autocomplete="off" required>
+                        <select id="chat-house" class="chat__select" title="Selecciona tu Casa de Hogwarts">
+                            <option value="Gryffindor">🦁 Gryffindor</option>
+                            <option value="Slytherin">🐍 Slytherin</option>
+                            <option value="Ravenclaw">🦅 Ravenclaw</option>
+                            <option value="Hufflepuff">🦡 Hufflepuff</option>
+                        </select>
+                    </div>
                     <button type="submit" class="btn btn--primary">Entrar ✨</button>
                 </form>
 
@@ -248,6 +259,9 @@
 
     <!-- Hidden audio element -->
     <audio id="audio-player" preload="none" crossorigin="anonymous"></audio>
+
+    <!-- Socket.io for Live Chat -->
+    <script src="/socket.io/socket.io.js" onerror="this.onerror=null;this.src='https://cdn.socket.io/4.8.1/socket.io.min.js';"></script>
 
     <!-- Scripts -->
     <script src="/js/app.js"></script>

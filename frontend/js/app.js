@@ -8,9 +8,9 @@
   // --- Configuration ---
   const CONFIG = {
     // These can be overridden by env vars injected at build/deploy time
-    AZURACAST_API_URL: window.__WIZARDFM_CONFIG__?.AZURACAST_API_URL || 'https://radio.wizardfm.lat',
-    STREAM_URL: window.__WIZARDFM_CONFIG__?.STREAM_URL || 'https://radio.wizardfm.lat/radio',
-    STATION_ID: window.__WIZARDFM_CONFIG__?.STATION_ID || 1,
+    AZURACAST_API_URL: window.__WIZARDFM_CONFIG__?.AZURACAST_API_URL || 'https://panel.wizardfm.lat',
+    STREAM_URL: window.__WIZARDFM_CONFIG__?.STREAM_URL || 'https://panel.wizardfm.lat/listen/wizardfm/radio.mp3',
+    STATION_ID: window.__WIZARDFM_CONFIG__?.STATION_ID || 'wizardfm',
     POLL_INTERVAL: 10000, // 10 seconds
     MAX_HISTORY: 8,
   };

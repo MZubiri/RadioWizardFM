@@ -1,16 +1,17 @@
 /* ==========================================================================
-   WizardFM — Live Chat Client
+   WizardFM — Live Chat Client (Socket.io + WebSocket fallback)
    ========================================================================== */
 
 (() => {
   'use strict';
 
-  // --- Configuration ---
-  const WS_URL = (() => {
-    const loc = window.location;
-    const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${loc.host}/ws`;
-  })();
+  // --- Hogwarts Houses ---
+  const HOUSES = {
+    Gryffindor: { name: 'Gryffindor', badge: '🦁 Gryffindor', color: '#f43f5e', class: 'gryffindor' },
+    Slytherin: { name: 'Slytherin', badge: '🐍 Slytherin', color: '#10b981', class: 'slytherin' },
+    Ravenclaw: { name: 'Ravenclaw', badge: '🦅 Ravenclaw', color: '#38bdf8', class: 'ravenclaw' },
+    Hufflepuff: { name: 'Hufflepuff', badge: '🦡 Hufflepuff', color: '#fbbf24', class: 'hufflepuff' },
+  };
 
   // --- DOM Elements ---
   const $ = (sel) => document.querySelector(sel);
@@ -18,190 +19,228 @@
   const chatJoinForm = $('#chat-join');
   const chatForm = $('#chat-form');
   const chatNicknameInput = $('#chat-nickname');
+  const chatHouseSelect = $('#chat-house');
   const chatInput = $('#chat-input');
   const chatUserCount = $('#chat-user-count');
 
   // --- State ---
+  let socket = null;
   let ws = null;
+  let isSocketIO = false;
   let nickname = '';
-  let reconnectAttempts = 0;
-  const MAX_RECONNECT = 5;
-  const RECONNECT_DELAY = 3000;
+  let selectedHouse = 'Gryffindor';
   let isConnected = false;
   let autoScroll = true;
+  const renderedMessageIds = new Set();
 
   // --- Initialize ---
   function init() {
     setupEventListeners();
-    connect();
+    connectChat();
   }
 
   // --- Event Listeners ---
   function setupEventListeners() {
     // Join chat
-    chatJoinForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const name = chatNicknameInput.value.trim();
-      if (!name) return;
+    if (chatJoinForm) {
+      chatJoinForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = chatNicknameInput.value.trim();
+        if (!name) return;
 
-      nickname = name;
-      joinChat(name);
-    });
+        nickname = name;
+        selectedHouse = chatHouseSelect ? chatHouseSelect.value : 'Gryffindor';
+        joinChat(name, selectedHouse);
+      });
+    }
 
     // Send message
-    chatForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const text = chatInput.value.trim();
-      if (!text || !isConnected) return;
+    if (chatForm) {
+      chatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        if (!text || !isConnected) return;
 
-      sendMessage(text);
-      chatInput.value = '';
-    });
+        sendMessage(text);
+        chatInput.value = '';
+      });
+    }
 
     // Auto-scroll detection
-    chatMessages.addEventListener('scroll', () => {
-      const { scrollTop, scrollHeight, clientHeight } = chatMessages;
-      autoScroll = scrollHeight - scrollTop - clientHeight < 50;
-    });
+    if (chatMessages) {
+      chatMessages.addEventListener('scroll', () => {
+        const { scrollTop, scrollHeight, clientHeight } = chatMessages;
+        autoScroll = scrollHeight - scrollTop - clientHeight < 50;
+      });
+    }
   }
 
-  // --- WebSocket ---
-  function connect() {
+  // --- Connection Router ---
+  function connectChat() {
+    if (typeof window.io !== 'undefined') {
+      connectSocketIO();
+    } else {
+      connectWebSocket();
+    }
+  }
+
+  // --- Socket.io (WizardFM Backend standard) ---
+  function connectSocketIO() {
     try {
-      ws = new WebSocket(WS_URL);
+      socket = window.io({
+        path: '/socket.io',
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 2000,
+      });
+      isSocketIO = true;
+
+      socket.on('connect', () => {
+        console.log('✨ Chat conectado via Socket.io');
+        isConnected = true;
+        if (nickname) {
+          joinChat(nickname, selectedHouse);
+        }
+      });
+
+      socket.on('userCount', (count) => {
+        updateUserCount(count);
+      });
+
+      socket.on('history', (history) => {
+        if (Array.isArray(history)) {
+          history.forEach((msg) => renderMessage(msg, false));
+        }
+      });
+
+      const handleMsg = (msg) => {
+        if (!msg) return;
+        renderMessage(msg, true);
+      };
+
+      socket.on('message', handleMsg);
+      socket.on('chat_message', handleMsg);
+
+      socket.on('error', (err) => {
+        const msg = typeof err === 'string' ? err : err?.message || 'Error en el chat';
+        addSystemMessage(`⚠️ ${msg}`);
+      });
+
+      socket.on('disconnect', () => {
+        console.log('Chat desconectado');
+        isConnected = false;
+      });
+    } catch (err) {
+      console.warn('Socket.io error, falling back to WebSocket:', err);
+      connectWebSocket();
+    }
+  }
+
+  // --- Raw WebSocket Fallback ---
+  function connectWebSocket() {
+    const loc = window.location;
+    const protocol = loc.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${loc.host}/ws`;
+
+    try {
+      ws = new WebSocket(wsUrl);
     } catch (err) {
       console.warn('WebSocket connection failed:', err);
-      scheduleReconnect();
       return;
     }
 
     ws.addEventListener('open', () => {
-      console.log('✨ Chat connected');
+      console.log('✨ Chat conectado via WebSocket');
       isConnected = true;
-      reconnectAttempts = 0;
-
-      // If we had a nickname, rejoin automatically
       if (nickname) {
-        joinChat(nickname);
+        ws.send(JSON.stringify({ type: 'join', nickname, house: selectedHouse }));
       }
     });
 
     ws.addEventListener('message', (event) => {
       try {
         const data = JSON.parse(event.data);
-        handleMessage(data);
-      } catch (err) {
-        console.warn('Invalid message:', err);
-      }
+        if (data.type === 'welcome') {
+          updateUserCount(data.userCount);
+          if (data.history) data.history.forEach((m) => renderMessage(m, false));
+        } else if (data.type === 'message') {
+          renderMessage(data, true);
+        } else if (data.type === 'user_count') {
+          updateUserCount(data.count);
+        } else if (data.type === 'system') {
+          addSystemMessage(data.message);
+        }
+      } catch (e) {}
     });
 
     ws.addEventListener('close', () => {
-      console.log('Chat disconnected');
       isConnected = false;
-      scheduleReconnect();
+      setTimeout(connectWebSocket, 4000);
     });
-
-    ws.addEventListener('error', (err) => {
-      console.warn('WebSocket error:', err);
-    });
-  }
-
-  function scheduleReconnect() {
-    if (reconnectAttempts >= MAX_RECONNECT) {
-      addSystemMessage('No se pudo conectar al chat. Recarga la página para intentar de nuevo.');
-      return;
-    }
-    reconnectAttempts++;
-    const delay = RECONNECT_DELAY * reconnectAttempts;
-    console.log(`Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`);
-    setTimeout(connect, delay);
-  }
-
-  function send(data) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(data));
-    }
   }
 
   // --- Actions ---
-  function joinChat(name) {
-    send({ type: 'join', nickname: name });
+  function joinChat(name, house) {
+    if (isSocketIO && socket) {
+      socket.emit('join', { name, house });
+    } else if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'join', nickname: name, house }));
+    }
+
+    if (chatJoinForm) chatJoinForm.hidden = true;
+    if (chatForm) {
+      chatForm.hidden = false;
+      chatInput.focus();
+    }
+
+    addSystemMessage(`✨ ¡Bienvenido/a a la sala común de ${house}, ${name}!`);
   }
 
   function sendMessage(text) {
-    send({ type: 'message', text });
-  }
+    const houseInfo = HOUSES[selectedHouse] || HOUSES.Gryffindor;
+    const payload = {
+      name: nickname,
+      house: selectedHouse,
+      color: houseInfo.color,
+      text: text,
+      timestamp: Date.now(),
+    };
 
-  // --- Message Handlers ---
-  function handleMessage(data) {
-    switch (data.type) {
-      case 'welcome':
-        onWelcome(data);
-        break;
-      case 'message':
-        onChatMessage(data);
-        break;
-      case 'system':
-        addSystemMessage(data.message);
-        break;
-      case 'user_count':
-        updateUserCount(data.count);
-        break;
-      case 'error':
-        onError(data.message);
-        break;
-      case 'clear':
-        clearMessages();
-        break;
+    if (isSocketIO && socket) {
+      socket.emit('message', payload);
+    } else if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'message', text, house: selectedHouse, color: houseInfo.color }));
     }
-  }
-
-  function onWelcome(data) {
-    nickname = data.nickname;
-
-    // Switch to message form
-    chatJoinForm.hidden = true;
-    chatForm.hidden = false;
-    chatInput.focus();
-
-    // Clear welcome message
-    chatMessages.innerHTML = '';
-
-    // Load history
-    if (data.history && data.history.length > 0) {
-      data.history.forEach((msg) => {
-        renderMessage(msg, false);
-      });
-    }
-
-    updateUserCount(data.userCount);
-    addSystemMessage(`Bienvenido, ${nickname} ✨`);
-    scrollToBottom();
-  }
-
-  function onChatMessage(data) {
-    renderMessage(data, true);
-  }
-
-  function onError(message) {
-    addSystemMessage(`⚠️ ${message}`);
   }
 
   // --- Rendering ---
   function renderMessage(msg, animate) {
+    // Unique key to prevent duplicates
+    const author = msg.name || msg.nickname || 'Anónimo';
+    const text = msg.text || '';
+    const time = msg.timestamp || 0;
+    const key = `${author}_${text}_${time}`;
+
+    if (renderedMessageIds.has(key)) return;
+    renderedMessageIds.add(key);
+
     const el = document.createElement('div');
     el.classList.add('chat-msg');
     if (animate) el.style.animation = 'fadeInUp 0.2s ease';
 
-    const time = msg.timestamp ? formatTime(msg.timestamp) : '';
-    const isMe = msg.nickname === nickname;
+    const houseName = msg.house || 'Gryffindor';
+    const houseInfo = HOUSES[houseName] || { color: msg.color || '#a78bfa', badge: houseName, class: 'general' };
+    const timeStr = time ? formatTime(time) : '';
+    const isMe = author === nickname;
 
     el.innerHTML = `
       <div class="chat-msg__header">
-        <span class="chat-msg__nickname" style="color: ${msg.color}">${escapeHtml(msg.nickname)}${isMe ? ' (tú)' : ''}</span>
-        <span class="chat-msg__time">${time}</span>
+        <span class="chat-msg__house-badge chat-msg__house-badge--${(houseInfo.class || 'general').toLowerCase()}">${escapeHtml(houseInfo.badge || houseName)}</span>
+        <span class="chat-msg__nickname" style="color: ${msg.color || houseInfo.color}">${escapeHtml(author)}${isMe ? ' (tú)' : ''}</span>
+        <span class="chat-msg__time">${timeStr}</span>
       </div>
-      <div class="chat-msg__text">${formatMessageText(msg.text)}</div>
+      <div class="chat-msg__text">${formatMessageText(text)}</div>
     `;
 
     chatMessages.appendChild(el);
@@ -222,18 +261,12 @@
     }
   }
 
-  function clearMessages() {
-    chatMessages.innerHTML = '';
-    addSystemMessage('Chat limpiado por un administrador');
-  }
-
   function updateUserCount(count) {
     if (chatUserCount) {
-      chatUserCount.textContent = `${count} en línea`;
+      chatUserCount.textContent = `${count || 1} en línea`;
     }
   }
 
-  // --- Helpers ---
   function scrollToBottom() {
     requestAnimationFrame(() => {
       chatMessages.scrollTop = chatMessages.scrollHeight;
@@ -254,10 +287,7 @@
   }
 
   function formatMessageText(text) {
-    // Escape HTML first (already done server-side, but just in case)
     let safe = escapeHtml(text);
-
-    // Convert common emoji shortcodes
     const emojis = {
       ':)': '😊', ':(': '😞', ':D': '😃', ':P': '😛',
       '<3': '❤️', ':fire:': '🔥', ':star:': '⭐',
@@ -268,7 +298,6 @@
     for (const [code, emoji] of Object.entries(emojis)) {
       safe = safe.split(code).join(emoji);
     }
-
     return safe;
   }
 
