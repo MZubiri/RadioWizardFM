@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WizardFM — Radio mágica en vivo. Música, podcasts, confesiones y audiolibros. Escucha ahora.">
+    <meta name="theme-color" content="#7c3aed">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="WizardFM — Radio Mágica en Vivo">
+    <meta property="og:description" content="Música, podcasts, confesiones y audiolibros. Sintoniza la magia.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://wizardfm.lat">
+    <meta property="og:image" content="https://wizardfm.lat/assets/og-image.png">
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/assets/logo.svg">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="/css/style.css">
+
+    <title>WizardFM — Radio Mágica en Vivo ✨</title>
+</head>
+<body>
+    <!-- Particles background -->
+    <div id="particles" class="particles" aria-hidden="true"></div>
+
+    <!-- Navbar -->
+    <header class="navbar" id="navbar">
+        <div class="navbar__brand">
+            <img src="/assets/logo.svg" alt="WizardFM Logo" class="navbar__logo" width="40" height="40">
+            <span class="navbar__name">WizardFM</span>
+        </div>
+        <nav class="navbar__links">
+            <a href="#player" class="navbar__link">Escuchar</a>
+            <a href="#shows" class="navbar__link">Shows</a>
+            <a href="#about" class="navbar__link">Nosotros</a>
+            <button id="install-btn" class="btn btn--outline btn--sm" hidden>
+                <span class="btn__icon">📲</span> Instalar App
+            </button>
+        </nav>
+        <button id="mobile-menu-btn" class="navbar__menu-btn" aria-label="Abrir menú">
+            <span></span><span></span><span></span>
+        </button>
+    </header>
+
+    <!-- Mobile Menu -->
+    <div id="mobile-menu" class="mobile-menu" hidden>
+        <a href="#player" class="mobile-menu__link">🎧 Escuchar</a>
+        <a href="#shows" class="mobile-menu__link">📅 Shows</a>
+        <a href="#about" class="mobile-menu__link">✨ Nosotros</a>
+        <button id="install-btn-mobile" class="btn btn--primary btn--full" hidden>📲 Instalar App</button>
+    </div>
+
+    <main>
+        <!-- Hero / Player Section -->
+        <section id="player" class="hero">
+            <!-- Live Badge -->
+            <div id="live-badge" class="live-badge live-badge--offline">
+                <span class="live-badge__dot"></span>
+                <span id="live-badge-text" class="live-badge__text">OFFLINE</span>
+            </div>
+
+            <!-- Now Playing Card -->
+            <div class="player-card" id="player-card">
+                <!-- Album Art -->
+                <div class="player-card__art-container">
+                    <div id="album-art" class="player-card__art">
+                        <div class="player-card__art-placeholder">
+                            <span>🧙‍♂️</span>
+                        </div>
+                    </div>
+                    <div class="player-card__art-glow" aria-hidden="true"></div>
+                </div>
+
+                <!-- Track Info -->
+                <div class="player-card__info">
+                    <h1 id="track-title" class="player-card__title">WizardFM</h1>
+                    <p id="track-artist" class="player-card__artist">Sintoniza la magia</p>
+                    <p id="dj-name" class="player-card__dj" hidden>
+                        <span class="player-card__dj-icon">🎧</span>
+                        <span id="dj-name-text">DJ</span>
+                    </p>
+                </div>
+
+                <!-- Visualizer Canvas -->
+                <canvas id="visualizer" class="player-card__visualizer" aria-hidden="true"></canvas>
+
+                <!-- Controls -->
+                <div class="player-card__controls">
+                    <button id="play-btn" class="play-btn" aria-label="Reproducir">
+                        <svg id="play-icon" class="play-btn__icon" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M8 5v14l11-7z"/>
+                        </svg>
+                        <svg id="pause-icon" class="play-btn__icon" viewBox="0 0 24 24" fill="currentColor" hidden>
+                            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                        </svg>
+                        <svg id="loading-icon" class="play-btn__icon play-btn__icon--loading" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" hidden>
+                            <circle cx="12" cy="12" r="10" stroke-dasharray="30 60"/>
+                        </svg>
+                    </button>
+
+                    <div class="volume-control">
+                        <button id="mute-btn" class="volume-control__btn" aria-label="Silenciar">
+                            <svg id="volume-icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
+                                <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                            </svg>
+                            <svg id="mute-icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20" hidden>
+                                <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+                            </svg>
+                        </button>
+                        <input type="range" id="volume-slider" class="volume-control__slider" min="0" max="100" value="75" aria-label="Volumen">
+                    </div>
+                </div>
+
+                <!-- Listener Count -->
+                <div class="player-card__listeners">
+                    <span class="player-card__listeners-icon">👤</span>
+                    <span id="listener-count" class="player-card__listeners-count">0</span>
+                    <span class="player-card__listeners-label">magos escuchando</span>
+                </div>
+            </div>
+
+            <!-- Song History -->
+            <div class="history" id="history-section">
+                <h2 class="history__title">📜 Hechizos Recientes</h2>
+                <ul id="history-list" class="history__list">
+                    <li class="history__empty">Aún no hay canciones registradas</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- Chat + Content area -->
+        <section class="content-grid">
+            <!-- Live Chat -->
+            <div class="chat" id="chat-section">
+                <div class="chat__header">
+                    <h2 class="chat__title">💬 Chat en Vivo</h2>
+                    <span id="chat-user-count" class="chat__user-count">0 en línea</span>
+                </div>
+
+                <div id="chat-messages" class="chat__messages">
+                    <div class="chat__welcome">
+                        <p>✨ Bienvenido al chat de WizardFM</p>
+                        <p class="chat__welcome-sub">Ingresa un nombre para unirte</p>
+                    </div>
+                </div>
+
+                <!-- Join Form -->
+                <form id="chat-join" class="chat__join">
+                    <input type="text" id="chat-nickname" class="chat__input" placeholder="Tu nombre mágico..." maxlength="20" autocomplete="off">
+                    <button type="submit" class="btn btn--primary">Entrar ✨</button>
+                </form>
+
+                <!-- Message Form (hidden until joined) -->
+                <form id="chat-form" class="chat__form" hidden>
+                    <input type="text" id="chat-input" class="chat__input" placeholder="Escribe un mensaje..." maxlength="500" autocomplete="off">
+                    <button type="submit" class="btn btn--primary btn--icon">
+                        <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Shows Schedule -->
+            <div class="shows" id="shows">
+                <h2 class="shows__title">📅 Programación</h2>
+                <div class="shows__list">
+                    <div class="show-card">
+                        <div class="show-card__time">LUN - VIE</div>
+                        <div class="show-card__info">
+                            <h3 class="show-card__name">🎵 Pociones Musicales</h3>
+                            <p class="show-card__desc">Los mejores hits y descubrimientos</p>
+                            <span class="show-card__host">DJ Wizard</span>
+                        </div>
+                        <span class="show-card__hour">20:00</span>
+                    </div>
+                    <div class="show-card">
+                        <div class="show-card__time">MAR - JUE</div>
+                        <div class="show-card__info">
+                            <h3 class="show-card__name">🎙️ Confesiones Nocturnas</h3>
+                            <p class="show-card__desc">Historias anónimas de los oyentes</p>
+                            <span class="show-card__host">Anfitrión Anónimo</span>
+                        </div>
+                        <span class="show-card__hour">22:00</span>
+                    </div>
+                    <div class="show-card">
+                        <div class="show-card__time">SÁB</div>
+                        <div class="show-card__info">
+                            <h3 class="show-card__name">📚 Audiolibros Mágicos</h3>
+                            <p class="show-card__desc">Lectura en vivo de libros fantásticos</p>
+                            <span class="show-card__host">El Narrador</span>
+                        </div>
+                        <span class="show-card__hour">18:00</span>
+                    </div>
+                    <div class="show-card">
+                        <div class="show-card__time">DOM</div>
+                        <div class="show-card__info">
+                            <h3 class="show-card__name">🎧 Podcast Wizardly</h3>
+                            <p class="show-card__desc">Conversaciones y debates</p>
+                            <span class="show-card__host">WizardFM Team</span>
+                        </div>
+                        <span class="show-card__hour">16:00</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- About -->
+        <section id="about" class="about">
+            <div class="about__content">
+                <h2 class="about__title">Sobre WizardFM</h2>
+                <p class="about__text">
+                    WizardFM es una radio online independiente donde la magia del audio cobra vida. 
+                    Desde música en vivo y DJ sets hasta podcasts, confesiones anónimas y audiolibros — 
+                    todo transmitido en vivo por locutores apasionados.
+                </p>
+                <p class="about__text">
+                    Sintoniza la magia. Únete a nuestra comunidad de magos oyentes. ✨
+                </p>
+                <div class="about__links">
+                    <a href="#" class="btn btn--outline" id="share-btn">Compartir 🔗</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer__content">
+            <div class="footer__brand">
+                <img src="/assets/logo.svg" alt="WizardFM" class="footer__logo" width="32" height="32">
+                <span class="footer__name">WizardFM</span>
+            </div>
+            <p class="footer__copy">&copy; 2025 WizardFM. Hecho con magia.</p>
+        </div>
+    </footer>
+
+    <!-- Hidden audio element -->
+    <audio id="audio-player" preload="none" crossorigin="anonymous"></audio>
+
+    <!-- Scripts -->
+    <script src="/js/app.js"></script>
+    <script src="/js/chat.js"></script>
+    <script src="/js/visualizer.js"></script>
+    <script src="/js/notifications.js"></script>
+</body>
+</html>

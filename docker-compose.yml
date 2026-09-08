@@ -1,0 +1,30 @@
+version: "3.8"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: wizardfm-frontend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    environment:
+      - AZURACAST_API_URL=${AZURACAST_API_URL:-https://radio.wizardfm.lat}
+      - STREAM_URL=${STREAM_URL:-https://radio.wizardfm.lat/radio}
+    restart: unless-stopped
+    depends_on:
+      - chat
+
+  chat:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: wizardfm-chat
+    ports:
+      - "${CHAT_PORT:-3001}:3001"
+    environment:
+      - WS_PORT=3001
+      - MAX_HISTORY=${MAX_HISTORY:-100}
+      - RATE_LIMIT_MS=${RATE_LIMIT_MS:-1000}
+      - MAX_MESSAGE_LENGTH=${MAX_MESSAGE_LENGTH:-500}
+    restart: unless-stopped

@@ -1,0 +1,12 @@
+{
+  "name": "wizardfm-chat",
+  "version": "1.0.0",
+  "description": "WizardFM live chat WebSocket server",
+  "main": "chat-server.js",
+  "scripts": {
+    "start": "node chat-server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

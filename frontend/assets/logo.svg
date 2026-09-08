@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" fill="none">
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#4c1d95"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <!-- Background circle -->
+  <circle cx="60" cy="60" r="56" fill="url(#g1)" opacity="0.9"/>
+  <circle cx="60" cy="60" r="56" fill="none" stroke="#a78bfa" stroke-width="1.5" opacity="0.4"/>
+  <!-- Wizard hat -->
+  <path d="M60 12 L42 65 L78 65 Z" fill="url(#g2)" filter="url(#glow)"/>
+  <path d="M55 12 Q60 28 68 35 Q58 30 52 22 Z" fill="#fde68a" opacity="0.5"/>
+  <!-- Hat brim -->
+  <ellipse cx="60" cy="65" rx="28" ry="8" fill="url(#g2)"/>
+  <!-- Star on hat -->
+  <path d="M60 25 L62 31 L68 31 L63 35 L65 41 L60 37 L55 41 L57 35 L52 31 L58 31 Z" fill="#fff" opacity="0.9" filter="url(#glow)"/>
+  <!-- Headphones -->
+  <path d="M32 72 Q30 58 36 48 Q42 38 60 38 Q78 38 84 48 Q90 58 88 72" fill="none" stroke="#c084fc" stroke-width="4" stroke-linecap="round"/>
+  <!-- Left ear cup -->
+  <rect x="26" y="68" width="12" height="20" rx="6" fill="#c084fc"/>
+  <rect x="28" y="70" width="8" height="16" rx="4" fill="#7c3aed"/>
+  <!-- Right ear cup -->
+  <rect x="82" y="68" width="12" height="20" rx="6" fill="#c084fc"/>
+  <rect x="84" y="70" width="8" height="16" rx="4" fill="#7c3aed"/>
+  <!-- Sound waves -->
+  <path d="M46 88 Q48 82 50 88 Q52 94 54 88" stroke="#fbbf24" stroke-width="2" fill="none" opacity="0.7"/>
+  <path d="M56 88 Q58 80 60 88 Q62 96 64 88" stroke="#fbbf24" stroke-width="2" fill="none" opacity="0.8"/>
+  <path d="M66 88 Q68 82 70 88 Q72 94 74 88" stroke="#fbbf24" stroke-width="2" fill="none" opacity="0.7"/>
+  <!-- Stars sparkle -->
+  <circle cx="22" cy="30" r="1.5" fill="#fbbf24" opacity="0.6"/>
+  <circle cx="95" cy="25" r="2" fill="#fbbf24" opacity="0.7"/>
+  <circle cx="100" cy="50" r="1" fill="#c084fc" opacity="0.5"/>
+  <circle cx="18" cy="55" r="1.5" fill="#c084fc" opacity="0.5"/>
+  <!-- FM text -->
+  <text x="60" y="110" text-anchor="middle" font-family="serif" font-weight="900" font-size="16" fill="#fbbf24" opacity="0.9">FM</text>
+</svg>
