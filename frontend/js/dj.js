@@ -51,27 +51,36 @@
   }
 
   // --- Tab Navigation ---
+  function switchDjTab(targetTab) {
+    const tabBtns = document.querySelectorAll('.dj-tab-btn');
+    tabBtns.forEach((b) => {
+      if (b.getAttribute('data-tab') === targetTab) {
+        b.classList.add('active');
+      } else {
+        b.classList.remove('active');
+      }
+    });
+    document.querySelectorAll('.dj-tab-content').forEach((content) => {
+      content.classList.remove('active');
+    });
+
+    const activeContent = document.getElementById(targetTab);
+    if (activeContent) {
+      activeContent.classList.add('active');
+    }
+
+    if (targetTab === 'tab-programacion') {
+      loadCrudSchedule();
+    }
+  }
+  window.switchDjTab = switchDjTab;
+
   function setupTabs() {
     const tabBtns = document.querySelectorAll('.dj-tab-btn');
     tabBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
         const targetTab = btn.getAttribute('data-tab');
-
-        tabBtns.forEach((b) => b.classList.remove('active'));
-        document.querySelectorAll('.dj-tab-content').forEach((content) => {
-          content.classList.remove('active');
-        });
-
-        btn.classList.add('active');
-        const activeContent = document.getElementById(targetTab);
-        if (activeContent) {
-          activeContent.classList.add('active');
-        }
-
-        // If switching to schedule, refresh it
-        if (targetTab === 'tab-programacion') {
-          loadCrudSchedule();
-        }
+        switchDjTab(targetTab);
       });
     });
   }
@@ -277,6 +286,7 @@
       crudShowsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">Error al cargar la programación.</div>';
     }
   }
+  window.loadCrudSchedule = loadCrudSchedule;
 
   function renderCrudSchedule(shows) {
     if (crudCountBadge) {

@@ -273,13 +273,27 @@
 
         <!-- Navegación por Pestañas -->
         <nav class="dj-tabs">
-            <button class="dj-tab-btn active" data-tab="tab-transmision">
+            <button class="dj-tab-btn active" data-tab="tab-transmision" onclick="switchDjTab('tab-transmision')">
                 🎙️ Transmisión & Al Aire
             </button>
-            <button class="dj-tab-btn" data-tab="tab-programacion">
+            <button class="dj-tab-btn" data-tab="tab-programacion" onclick="switchDjTab('tab-programacion')">
                 📅 Gestión de Programación (CRUD)
             </button>
         </nav>
+
+        <script>
+            function switchDjTab(targetTab) {
+                document.querySelectorAll('.dj-tab-btn').forEach(function(b) {
+                    b.classList.toggle('active', b.getAttribute('data-tab') === targetTab);
+                });
+                document.querySelectorAll('.dj-tab-content').forEach(function(c) {
+                    c.classList.toggle('active', c.id === targetTab);
+                });
+                if (targetTab === 'tab-programacion' && typeof window.loadCrudSchedule === 'function') {
+                    window.loadCrudSchedule();
+                }
+            }
+        </script>
 
         <!-- PESTAÑA 1: TRANSMISIÓN Y AL AIRE -->
         <div id="tab-transmision" class="dj-tab-content active">
@@ -447,6 +461,6 @@
 
     <!-- Socket.io -->
     <script src="/socket.io/socket.io.js" onerror="this.onerror=null;this.src='https://cdn.socket.io/4.8.1/socket.io.min.js';"></script>
-    <script src="/js/dj.js"></script>
+    <script src="/js/dj.js?v=2.2"></script>
 </body>
 </html>
