@@ -297,11 +297,13 @@
     const isOnline = Boolean(nowPlayingData.is_online ?? nowPlayingData.station?.is_online);
 
     if (isDJLive) {
+      const liveTitle = streamer && streamer !== 'Locutor' ? `En Vivo con ${streamer}` : 'Transmisión en Vivo';
+      const liveArt = nowPlayingData.live?.art || '/assets/icons/icon-512.png';
       updateMediaSession(
-        `En Vivo con ${streamer || 'Locutor'}`,
-        'WizardFM',
+        liveTitle,
+        'WizardFM — Cabina Digital 🎙️',
         'wizardfm.lat — Transmisión en Vivo',
-        nowPlayingData.live?.art || song?.art || '/assets/icons/icon-512.png'
+        liveArt
       );
     } else if (isOnline && song?.title && song.title !== 'Station Offline') {
       updateMediaSession(
@@ -353,6 +355,9 @@
     const wasLive = isLive;
     isLive = isDJLive;
 
+    // Highlight card styling when live
+    playerCard.classList.toggle('player-card--live', isDJLive);
+
     // Badge state
     updateLiveBadge(isDJLive, isStationOnline);
 
@@ -377,13 +382,23 @@
       djName.classList.remove('player-card__dj--live');
     }
 
-    // Current song
+    // Live Streamer Active vs AutoDJ Song
     const song = data.now_playing?.song;
-    if (song) {
+    if (isDJLive) {
+      // Streamer is broadcasting live: display custom live title, subtitle and station logo
+      const liveTitle = dj && dj !== 'Locutor' ? `En Vivo con ${dj}` : 'Transmisión en Vivo';
+      trackTitle.textContent = liveTitle;
+      trackArtist.textContent = 'WizardFM — Cabina Digital 🎙️';
+
+      const liveArt = data.live?.art || '/assets/icons/icon-512.png';
+      albumArt.innerHTML = `<img src="${liveArt}" alt="WizardFM en Vivo" class="player-card__art-img--live" loading="lazy">`;
+
+      document.title = `🔴 ${liveTitle} — WizardFM ✨`;
+    } else if (song) {
       if ((isStationOnline || isPlaying) && song.title && song.title !== 'Station Offline') {
         trackTitle.textContent = song.title;
         trackArtist.textContent = song.artist || 'WizardFM';
-      } else if (!isStationOnline && !isDJLive && !isPlaying) {
+      } else if (!isStationOnline && !isPlaying) {
         trackTitle.textContent = 'WizardFM';
         trackArtist.textContent = 'Transmisión Fuera del Aire';
       } else {
@@ -399,9 +414,7 @@
       }
 
       // Update page title
-      if (isDJLive) {
-        document.title = `🔴 En Vivo con ${dj} — WizardFM ✨`;
-      } else if (song.title && song.title !== 'Station Offline') {
+      if (song.title && song.title !== 'Station Offline') {
         document.title = `${song.title} — WizardFM ✨`;
       } else {
         document.title = 'WizardFM — Radio Mágica en Vivo ✨';

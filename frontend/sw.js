@@ -3,7 +3,7 @@
    PWA offline support and asset caching
    ========================================================================== */
 
-const CACHE_NAME = 'wizardfm-v5';
+const CACHE_NAME = 'wizardfm-v6';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
