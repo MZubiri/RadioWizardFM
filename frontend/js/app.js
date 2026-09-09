@@ -667,6 +667,14 @@
     }
   }
 
+  function updateHistoryArt(trackId, coverUrl) {
+    if (!historyList) return;
+    const artContainers = historyList.querySelectorAll(`[data-track-id="${trackId}"] .history__item-art`);
+    artContainers.forEach((container) => {
+      container.innerHTML = `<img src="${escapeHtml(coverUrl)}" alt="" loading="lazy" onerror="this.onerror=null; this.parentElement.textContent='🎵';">`;
+    });
+  }
+
   function updateHistory(history) {
     if (!historyList) return;
     const items = history.slice(0, CONFIG.MAX_HISTORY);
@@ -679,9 +687,6 @@
     historyList.innerHTML = items.map((entry) => {
       const song = entry.song || {};
       const playedAt = entry.played_at ? formatTime(entry.played_at * 1000) : '';
-      const artHtml = song.art
-        ? `<img src="${escapeHtml(song.art)}" alt="" loading="lazy" onerror="this.onerror=null; this.parentElement.textContent='🎵';">`
-        : '🎵';
 
       let title = (song.title || '').trim();
       let artist = (song.artist || '').trim();
@@ -695,8 +700,37 @@
         title = rawText;
       }
 
+      const itunesArtist = (artist && artist.toLowerCase() !== 'desconocido' && artist.toLowerCase() !== 'unknown') ? artist : '';
+      const trackKey = `${itunesArtist} - ${title}`.trim().toLowerCase();
+      const trackId = 'trk-' + encodeURIComponent(trackKey).replace(/[^a-zA-Z0-9_-]/g, '_');
+
+      // Check iTunes cover cache or direct custom art (ignore AzuraCast generic placeholder)
+      const cachedCover = coverCache.get(trackKey);
+      const isGenericAzuraArt = song.art && song.art.includes('generic_song');
+      const directRadioArt = (song.art && !isGenericAzuraArt) ? song.art : null;
+
+      let effectiveArt = null;
+      if (cachedCover) {
+        effectiveArt = cachedCover;
+      } else if (cachedCover === null) {
+        effectiveArt = directRadioArt;
+      } else {
+        effectiveArt = directRadioArt;
+        if (title && title !== 'Station Offline') {
+          fetchTrackCover(itunesArtist, title).then((itunesCover) => {
+            if (itunesCover) {
+              updateHistoryArt(trackId, itunesCover);
+            }
+          });
+        }
+      }
+
+      const artHtml = effectiveArt
+        ? `<img src="${escapeHtml(effectiveArt)}" alt="" loading="lazy" onerror="this.onerror=null; this.parentElement.textContent='🎵';">`
+        : '🎵';
+
       return `
-        <li class="history__item">
+        <li class="history__item" data-track-id="${trackId}">
           <div class="history__item-art">${artHtml}</div>
           <div class="history__item-info">
             <div class="history__item-title">${escapeHtml(title || 'Sin título')}</div>
