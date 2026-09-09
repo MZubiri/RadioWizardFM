@@ -292,34 +292,84 @@
     }
 
     const isDJLive = Boolean(nowPlayingData.live?.is_live);
-    const streamer = nowPlayingData.live?.streamer_name;
+    const streamer = (nowPlayingData.live?.streamer_name || '').trim();
     const song = nowPlayingData.now_playing?.song;
     const isOnline = Boolean(nowPlayingData.is_online ?? nowPlayingData.station?.is_online);
 
-    if (isDJLive) {
-      const liveTitle = streamer && streamer !== 'Locutor' ? `En Vivo con ${streamer}` : 'Transmisión en Vivo';
-      const liveArt = nowPlayingData.live?.art || '/assets/icons/icon-512.png';
+    let title = (song?.title || '').trim();
+    let artist = (song?.artist || '').trim();
+    const songText = (song?.text || '').trim();
+
+    if ((!artist || artist.toLowerCase() === 'desconocido') && title.includes(' - ')) {
+      const parts = title.split(' - ');
+      artist = parts[0].trim();
+      title = parts.slice(1).join(' - ').trim();
+    } else if (!title && songText) {
+      title = songText;
+    }
+
+    const hasValidSong = Boolean(title && title !== 'Station Offline');
+    const art = song?.art || (isDJLive ? nowPlayingData.live?.art : null) || '/assets/icons/icon-512.png';
+
+    if (hasValidSong) {
+      const album = isDJLive
+        ? (streamer ? `En Vivo con ${streamer} • WizardFM` : 'En Vivo en Cabina • WizardFM')
+        : 'WizardFM Radio Online';
+      updateMediaSession(title, artist || 'WizardFM', album, art);
+    } else if (isDJLive) {
+      const liveTitle = streamer ? `En Vivo con ${streamer}` : 'Transmisión en Vivo';
       updateMediaSession(
         liveTitle,
         'WizardFM — Cabina Digital 🎙️',
         'wizardfm.lat — Transmisión en Vivo',
-        liveArt
+        art
       );
-    } else if (isOnline && song?.title && song.title !== 'Station Offline') {
-      updateMediaSession(
-        song.title,
-        song.artist || 'WizardFM',
-        'wizardfm.lat — Radio Online',
-        song.art || '/assets/icons/icon-512.png'
-      );
-    } else {
+    } else if (isOnline) {
       updateMediaSession(
         'WizardFM — Radio Mágica',
         'wizardfm.lat',
         'WizardFM Radio Online',
         '/assets/icons/icon-512.png'
       );
+    } else {
+      updateMediaSession(
+        'WizardFM',
+        'Fuera del Aire',
+        'wizardfm.lat',
+        '/assets/icons/icon-512.png'
+      );
     }
+  }
+
+  // --- Helper: Parse payload from REST or SSE (AzuraCast / Centrifugo) ---
+  function parseNowPlayingData(raw) {
+    if (!raw) return null;
+    let d = raw;
+    if (typeof raw === 'string') {
+      try {
+        d = JSON.parse(raw);
+      } catch {
+        return null;
+      }
+    }
+
+    // Unwrap Centrifugo publish envelope if present
+    if (d.pub?.data) {
+      d = d.pub.data;
+    } else if (d.data) {
+      d = d.data;
+    }
+
+    // Unwrap row / rows (AzuraCast SSE formats)
+    if (d.row) {
+      d = d.row;
+    } else if (Array.isArray(d.rows) && d.rows.length > 0) {
+      d = d.rows[0];
+    } else if (Array.isArray(d) && d.length > 0) {
+      d = d[0];
+    }
+
+    return d;
   }
 
   // --- Now Playing (AzuraCast API) ---
@@ -334,17 +384,20 @@
       updateNowPlaying(data);
     } catch (err) {
       console.warn('Failed to fetch now playing:', err.message);
-      // Don't update UI on error — keep last known state
+      // Keep last known state on network error
     }
   }
 
-  function updateNowPlaying(data) {
-    if (!data) return;
+  function updateNowPlaying(raw) {
+    const data = parseNowPlayingData(raw);
+    if (!data || (!data.now_playing && !data.station && !data.live && !data.listeners)) {
+      return;
+    }
     nowPlayingData = data;
 
     // Station & DJ state
     const isDJLive = Boolean(data.live?.is_live);
-    const dj = data.live?.streamer_name || 'Locutor';
+    const dj = (data.live?.streamer_name || '').trim();
     const isStationOnline = Boolean(
       data.is_online ??
       data.station?.is_online ??
@@ -364,7 +417,7 @@
     // Notify listeners if streamer just connected
     if (isDJLive && !wasLive) {
       if (window.WizardNotifications) {
-        window.WizardNotifications.notifyLive(dj);
+        window.WizardNotifications.notifyLive(dj || 'Locutor');
       }
     }
 
@@ -372,84 +425,127 @@
     if (isDJLive) {
       djName.hidden = false;
       djName.classList.add('player-card__dj--live');
-      djNameText.textContent = `Conduce: ${dj}`;
+      const djIcon = djName.querySelector('.player-card__dj-icon');
+      if (djIcon) djIcon.textContent = '🎙️';
+      djNameText.textContent = dj ? `En Vivo: ${dj}` : 'En Vivo en Cabina';
     } else if (isStationOnline) {
       djName.hidden = false;
       djName.classList.remove('player-card__dj--live');
-      djNameText.textContent = 'Música Continua';
+      const djIcon = djName.querySelector('.player-card__dj-icon');
+      if (djIcon) djIcon.textContent = '✨';
+      djNameText.textContent = 'Música Continua (AutoDJ)';
     } else {
       djName.hidden = true;
       djName.classList.remove('player-card__dj--live');
     }
 
-    // Live Streamer Active vs AutoDJ Song
+    // Song metadata
     const song = data.now_playing?.song;
-    if (isDJLive) {
-      // Streamer is broadcasting live: display custom live title, subtitle and station logo
-      const liveTitle = dj && dj !== 'Locutor' ? `En Vivo con ${dj}` : 'Transmisión en Vivo';
-      trackTitle.textContent = liveTitle;
-      trackArtist.textContent = 'WizardFM — Cabina Digital 🎙️';
+    let songTitle = (song?.title || '').trim();
+    let songArtist = (song?.artist || '').trim();
+    const songText = (song?.text || '').trim();
+    const songArt = song?.art || '';
 
-      const liveArt = data.live?.art || '/assets/icons/icon-512.png';
-      albumArt.innerHTML = `<img src="${liveArt}" alt="WizardFM en Vivo" class="player-card__art-img--live" loading="lazy">`;
+    // Smart formatting: if artist is empty but title or songText has "Artist - Title"
+    if ((!songArtist || songArtist.toLowerCase() === 'desconocido' || songArtist.toLowerCase() === 'unknown') && songTitle.includes(' - ')) {
+      const parts = songTitle.split(' - ');
+      songArtist = parts[0].trim();
+      songTitle = parts.slice(1).join(' - ').trim();
+    } else if ((!songTitle || songTitle === 'Sin título') && songText.includes(' - ')) {
+      const parts = songText.split(' - ');
+      songArtist = parts[0].trim();
+      songTitle = parts.slice(1).join(' - ').trim();
+    } else if (!songTitle && songText) {
+      songTitle = songText;
+    }
 
-      document.title = `🔴 ${liveTitle} — WizardFM ✨`;
-    } else if (song) {
-      if ((isStationOnline || isPlaying) && song.title && song.title !== 'Station Offline') {
-        trackTitle.textContent = song.title;
-        trackArtist.textContent = song.artist || 'WizardFM';
-      } else if (!isStationOnline && !isPlaying) {
-        trackTitle.textContent = 'WizardFM';
-        trackArtist.textContent = 'Transmisión Fuera del Aire';
-      } else {
-        trackTitle.textContent = song.title || 'WizardFM';
-        trackArtist.textContent = song.artist || 'Sintoniza la magia';
+    // Determine final displayed song title and artist
+    let displayTitle = '';
+    let displayArtist = '';
+    const hasValidSong = Boolean(songTitle && songTitle !== 'Station Offline');
+
+    if (hasValidSong) {
+      displayTitle = songTitle;
+      displayArtist = songArtist || (isDJLive ? (dj || 'WizardFM') : 'WizardFM');
+    } else if (isDJLive) {
+      displayTitle = dj ? `En Vivo con ${dj}` : 'Transmisión en Vivo';
+      displayArtist = 'WizardFM — Cabina Digital 🎙️';
+    } else if (isStationOnline || isPlaying) {
+      displayTitle = 'WizardFM';
+      displayArtist = 'Sintoniza la magia ✨';
+    } else {
+      displayTitle = 'WizardFM';
+      displayArtist = 'Transmisión Fuera del Aire';
+    }
+
+    // Update Track Info DOM
+    if (trackTitle.textContent !== displayTitle) {
+      trackTitle.textContent = displayTitle;
+    }
+    if (trackArtist.textContent !== displayArtist) {
+      trackArtist.textContent = displayArtist;
+    }
+
+    // Album Art
+    if (hasValidSong && songArt) {
+      const currentImg = albumArt.querySelector('img');
+      if (!currentImg || currentImg.getAttribute('src') !== songArt) {
+        albumArt.innerHTML = `<img src="${escapeHtml(songArt)}" alt="${escapeHtml(displayTitle)}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'player-card__art-placeholder\\'><span>🧙‍♂️</span></div>';">`;
       }
-
-      // Album art
-      if (song.art) {
-        albumArt.innerHTML = `<img src="${song.art}" alt="Album art" loading="lazy">`;
-      } else {
+    } else if (isDJLive && data.live?.art) {
+      const currentImg = albumArt.querySelector('img');
+      if (!currentImg || currentImg.getAttribute('src') !== data.live.art) {
+        albumArt.innerHTML = `<img src="${escapeHtml(data.live.art)}" alt="En Vivo" class="player-card__art-img--live" loading="lazy">`;
+      }
+    } else {
+      if (!albumArt.querySelector('.player-card__art-placeholder')) {
         albumArt.innerHTML = '<div class="player-card__art-placeholder"><span>🧙‍♂️</span></div>';
-      }
-
-      // Update page title
-      if (song.title && song.title !== 'Station Offline') {
-        document.title = `${song.title} — WizardFM ✨`;
-      } else {
-        document.title = 'WizardFM — Radio Mágica en Vivo ✨';
       }
     }
 
-    // Listener count
+    // Page Title
+    if (isDJLive) {
+      document.title = hasValidSong
+        ? `🔴 ${displayTitle} — ${displayArtist} | WizardFM ✨`
+        : `🔴 ${displayTitle} — WizardFM ✨`;
+    } else if (hasValidSong) {
+      document.title = `🎵 ${displayTitle} — ${displayArtist} | WizardFM ✨`;
+    } else {
+      document.title = 'WizardFM — Radio Mágica en Vivo ✨';
+    }
+
+    // Listeners count
     const listeners = data.listeners?.total ?? data.listeners?.current ?? 0;
     listenerCount.textContent = listeners;
 
     // Song history
-    if (data.song_history && data.song_history.length > 0) {
+    if (Array.isArray(data.song_history) && data.song_history.length > 0) {
       updateHistory(data.song_history);
     }
 
-    // Sync media session for mobile lock screens and Bluetooth
+    // Sync media session for lock screen and Bluetooth
     syncMediaSessionState();
   }
 
   function updateLiveBadge(isDJLive, isStationOnline) {
     if (isDJLive) {
       liveBadge.className = 'live-badge live-badge--on-air';
-      liveBadgeText.textContent = '🔴 EN EL AIRE';
+      liveBadgeText.textContent = 'EN VIVO';
     } else if (isStationOnline || isPlaying) {
       liveBadge.className = 'live-badge live-badge--autodj';
-      liveBadgeText.textContent = '🟢 EN LÍNEA';
+      liveBadgeText.textContent = 'EN LÍNEA';
     } else {
       liveBadge.className = 'live-badge live-badge--offline';
       liveBadgeText.textContent = 'FUERA DEL AIRE';
     }
   }
 
-  // --- Server-Sent Events (Realtime Now Playing) ---
+  // --- Server-Sent Events (Realtime Now Playing - 0 latency) ---
   function setupSSE() {
-    if (typeof window.EventSource === 'undefined') return;
+    if (typeof window.EventSource === 'undefined') {
+      console.warn('SSE not supported in this browser, relying on polling.');
+      return;
+    }
 
     try {
       const sseUrl = `${CONFIG.AZURACAST_API_URL}/api/live/nowplaying/sse?stations=${CONFIG.STATION_ID}`;
@@ -462,26 +558,21 @@
       sseSource.onmessage = (event) => {
         try {
           const raw = JSON.parse(event.data);
-          let payload = null;
+          const np = parseNowPlayingData(raw);
 
-          if (raw.pub?.data) {
-            payload = raw.pub.data;
-          } else if (raw.station) {
-            payload = raw;
-          } else if (Array.isArray(raw) && raw.length > 0) {
-            payload = raw[0];
-          }
-
-          if (payload && (payload.station || payload.live || payload.now_playing)) {
-            updateNowPlaying(payload);
+          if (np && (np.now_playing || np.station || np.live || np.listeners)) {
+            if (np.now_playing?.song?.text) {
+              console.log('Sonando ahora:', np.now_playing.song.text);
+            }
+            updateNowPlaying(np);
           }
         } catch (err) {
-          // Ignore Centrifugo ping/connect/non-JSON frames
+          // Ignore non-JSON or ping frames
         }
       };
 
       sseSource.onerror = () => {
-        // EventSource will automatically reconnect; polling remains active as backup
+        // EventSource will automatically retry connecting; polling remains active as backup
       };
     } catch (err) {
       console.warn('SSE setup error, using polling fallback:', err);
@@ -489,6 +580,7 @@
   }
 
   function updateHistory(history) {
+    if (!historyList) return;
     const items = history.slice(0, CONFIG.MAX_HISTORY);
 
     if (items.length === 0) {
@@ -497,18 +589,30 @@
     }
 
     historyList.innerHTML = items.map((entry) => {
-      const song = entry.song;
+      const song = entry.song || {};
       const playedAt = entry.played_at ? formatTime(entry.played_at * 1000) : '';
       const artHtml = song.art
-        ? `<img src="${song.art}" alt="" loading="lazy">`
+        ? `<img src="${escapeHtml(song.art)}" alt="" loading="lazy" onerror="this.onerror=null; this.parentElement.textContent='🎵';">`
         : '🎵';
+
+      let title = (song.title || '').trim();
+      let artist = (song.artist || '').trim();
+      const rawText = (song.text || '').trim();
+
+      if ((!artist || artist.toLowerCase() === 'desconocido') && title.includes(' - ')) {
+        const parts = title.split(' - ');
+        artist = parts[0].trim();
+        title = parts.slice(1).join(' - ').trim();
+      } else if (!title && rawText) {
+        title = rawText;
+      }
 
       return `
         <li class="history__item">
           <div class="history__item-art">${artHtml}</div>
           <div class="history__item-info">
-            <div class="history__item-title">${escapeHtml(song.title || 'Sin título')}</div>
-            <div class="history__item-artist">${escapeHtml(song.artist || 'Desconocido')}</div>
+            <div class="history__item-title">${escapeHtml(title || 'Sin título')}</div>
+            <div class="history__item-artist">${escapeHtml(artist || 'Desconocido')}</div>
           </div>
           <span class="history__item-time">${playedAt}</span>
         </li>
