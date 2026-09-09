@@ -15,8 +15,12 @@
   const djImportSubmit = $('#dj-import-submit');
   const djImportMsg = $('#dj-import-msg');
   const djLechuzas = $('#dj-lechuzas');
+  const djClearChatBtn = $('#dj-clear-chat-btn');
+  const djClearStatus = $('#dj-clear-status');
+  const djScheduleList = $('#dj-schedule-list');
 
   const API_NOWPLAYING = 'https://panel.wizardfm.lat/api/nowplaying/wizardfm';
+  let chatSocket = null;
   let firstMessage = true;
 
   // --- Initialize ---
@@ -25,6 +29,8 @@
     setInterval(fetchStatus, 8000);
     connectChatListener();
     setupImportForm();
+    setupClearChat();
+    fetchSchedule();
   }
 
   // --- Fetch Station Status ---
@@ -59,7 +65,7 @@
     if (typeof window.io === 'undefined') return;
 
     try {
-      const socket = window.io({
+      chatSocket = window.io({
         path: '/socket.io',
         transports: ['websocket', 'polling'],
       });
@@ -69,12 +75,29 @@
         addLechuza(msg);
       };
 
-      socket.on('message', handleMsg);
-      socket.on('chat_message', handleMsg);
-      socket.on('history', (history) => {
+      chatSocket.on('message', handleMsg);
+      chatSocket.on('chat_message', handleMsg);
+
+      chatSocket.on('history', (history) => {
         if (Array.isArray(history)) {
-          history.slice(-10).forEach(addLechuza);
+          djLechuzas.innerHTML = '';
+          firstMessage = history.length === 0;
+          if (history.length === 0) {
+            djLechuzas.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem 0; font-size: 0.9rem;">No hay mensajes previos... 🦉✨</div>';
+          } else {
+            history.slice(-15).forEach(addLechuza);
+          }
         }
+      });
+
+      chatSocket.on('chat_cleared', () => {
+        djLechuzas.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem 0; font-size: 0.9rem;">🧹 Chat vaciado por el administrador. Esperando lechuzas... 🦉</div>';
+        firstMessage = true;
+      });
+
+      chatSocket.on('clear', () => {
+        djLechuzas.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem 0; font-size: 0.9rem;">🧹 Chat vaciado por el administrador. Esperando lechuzas... 🦉</div>';
+        firstMessage = true;
       });
     } catch (e) {
       console.warn('Error connecting to chat:', e);
@@ -97,18 +120,101 @@
     `;
 
     const name = escapeHtml(msg.name || msg.nickname || 'Anónimo');
-    const house = msg.house || 'Mago';
+    const isAlta = (msg.name && msg.name.toUpperCase().includes('ALTA')) || (msg.house && msg.house.toUpperCase() === 'ALTA');
+    const house = isAlta ? '🔮 ALTA' : (msg.house || 'Mago');
+    const badgeColor = isAlta ? '#c084fc' : (msg.color || '#fbbf24');
     const text = escapeHtml(msg.text || '');
 
     item.innerHTML = `
       <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
-        <strong style="color: ${msg.color || '#fbbf24'};">${name} <span style="font-size: 0.75rem; opacity: 0.8;">(${house})</span>:</strong>
+        <strong style="color: ${badgeColor};">${name} <span style="font-size: 0.75rem; opacity: 0.8;">(${house})</span>:</strong>
       </div>
       <div style="color: var(--text-primary);">${text}</div>
     `;
 
     djLechuzas.appendChild(item);
     djLechuzas.scrollTop = djLechuzas.scrollHeight;
+  }
+
+  // --- Clear Chat Handler ---
+  function setupClearChat() {
+    if (!djClearChatBtn) return;
+
+    djClearChatBtn.addEventListener('click', () => {
+      const confirmClear = confirm('¿Estás seguro de que deseas vaciar todos los mensajes del chat en vivo? Esta acción borrará el chat para todos los oyentes.');
+      if (!confirmClear) return;
+
+      if (chatSocket) {
+        chatSocket.emit('clear_chat');
+        if (djClearStatus) {
+          djClearStatus.style.display = 'block';
+          djClearStatus.style.background = 'rgba(34, 197, 94, 0.15)';
+          djClearStatus.style.border = '1px solid rgba(34, 197, 94, 0.4)';
+          djClearStatus.style.color = '#4ade80';
+          djClearStatus.textContent = '🧹 El chat ha sido vaciado exitosamente en la radio.';
+          setTimeout(() => {
+            djClearStatus.style.display = 'none';
+          }, 4000);
+        }
+      } else {
+        alert('El socket de chat no está conectado.');
+      }
+    });
+  }
+
+  // --- Schedule Fetcher ---
+  async function fetchSchedule() {
+    if (!djScheduleList) return;
+
+    try {
+      // 1. Try AzuraCast API schedule
+      let shows = [];
+      try {
+        const azRes = await fetch('https://panel.wizardfm.lat/api/station/1/schedule');
+        if (azRes.ok) {
+          const azData = await azRes.json();
+          if (Array.isArray(azData) && azData.length > 0) {
+            shows = azData.map((item) => ({
+              days: item.start ? new Date(item.start).toLocaleDateString('es', { weekday: 'short' }).toUpperCase() : 'HORARIO',
+              time: item.start ? new Date(item.start).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '00:00',
+              name: item.name || 'Emisión Especial',
+              host: item.type === 'streamer' ? 'Locutor en Vivo' : 'Playlist AutoDJ',
+            }));
+          }
+        }
+      } catch (e) {}
+
+      // 2. Fallback to schedule.json
+      if (shows.length === 0) {
+        const jsonRes = await fetch('/data/schedule.json');
+        if (jsonRes.ok) {
+          shows = await jsonRes.json();
+        }
+      }
+
+      if (shows.length > 0) {
+        djScheduleList.innerHTML = shows
+          .map(
+            (s) => `
+          <div class="dj-schedule-item">
+            <div>
+              <strong style="color: #fff;">${escapeHtml(s.name)}</strong>
+              <div style="color: var(--text-muted); font-size: 0.75rem;">${escapeHtml(s.host || '')}</div>
+            </div>
+            <div style="text-align: right; color: var(--gold-400); font-weight: 600;">
+              <div>${escapeHtml(s.time)}</div>
+              <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(s.days)}</div>
+            </div>
+          </div>
+        `
+          )
+          .join('');
+      } else {
+        djScheduleList.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 1rem;">No hay programas registrados.</div>';
+      }
+    } catch (e) {
+      djScheduleList.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 1rem;">Error cargando programación.</div>';
+    }
   }
 
   // --- Music Importer Form ---

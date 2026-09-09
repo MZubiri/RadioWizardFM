@@ -1,0 +1,34 @@
+[
+  {
+    "id": "pociones-musicales",
+    "name": "🎵 Pociones Musicales",
+    "days": "LUN - VIE",
+    "time": "20:00",
+    "desc": "Los mejores hits y descubrimientos del mundo mágico",
+    "host": "DJ Wizard"
+  },
+  {
+    "id": "confesiones-nocturnas",
+    "name": "🎙️ Confesiones Nocturnas",
+    "days": "MAR - JUE",
+    "time": "22:00",
+    "desc": "Historias anónimas, secretos y relatos de los oyentes",
+    "host": "Anfitrión Anónimo"
+  },
+  {
+    "id": "audiolibros-magicos",
+    "name": "📚 Audiolibros Mágicos",
+    "days": "SÁB",
+    "time": "18:00",
+    "desc": "Lectura en vivo de capítulos y literatura fantástica",
+    "host": "El Narrador"
+  },
+  {
+    "id": "podcast-wizardly",
+    "name": "🎧 Podcast Wizardly",
+    "days": "DOM",
+    "time": "16:00",
+    "desc": "Debates, teorías y charlas sobre el universo mágico",
+    "host": "WizardFM Team"
+  }
+]

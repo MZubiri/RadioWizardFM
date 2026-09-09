@@ -5,12 +5,13 @@
 (() => {
   'use strict';
 
-  // --- Hogwarts Houses ---
+  // --- Hogwarts Houses & Secret Role ALTA ---
   const HOUSES = {
     Gryffindor: { name: 'Gryffindor', badge: '🦁 Gryffindor', color: '#f43f5e', class: 'gryffindor' },
     Slytherin: { name: 'Slytherin', badge: '🐍 Slytherin', color: '#10b981', class: 'slytherin' },
     Ravenclaw: { name: 'Ravenclaw', badge: '🦅 Ravenclaw', color: '#38bdf8', class: 'ravenclaw' },
     Hufflepuff: { name: 'Hufflepuff', badge: '🦡 Hufflepuff', color: '#fbbf24', class: 'hufflepuff' },
+    ALTA: { name: 'ALTA', badge: '🔮 Orden ALTA', color: '#c084fc', class: 'alta' },
   };
 
   // --- DOM Elements ---
@@ -49,7 +50,14 @@
         if (!name) return;
 
         nickname = name;
-        selectedHouse = chatHouseSelect ? chatHouseSelect.value : 'Gryffindor';
+
+        // 5ta Opción Secreta: Si el nombre contiene la clave "ALTA"
+        if (name.toUpperCase().includes('ALTA')) {
+          selectedHouse = 'ALTA';
+        } else {
+          selectedHouse = chatHouseSelect ? chatHouseSelect.value : 'Gryffindor';
+        }
+
         joinChat(name, selectedHouse);
       });
     }
@@ -122,6 +130,14 @@
       socket.on('message', handleMsg);
       socket.on('chat_message', handleMsg);
 
+      // Limpieza de chat desde el panel admin
+      socket.on('chat_cleared', () => {
+        clearMessages();
+      });
+      socket.on('clear', () => {
+        clearMessages();
+      });
+
       socket.on('error', (err) => {
         const msg = typeof err === 'string' ? err : err?.message || 'Error en el chat';
         addSystemMessage(`⚠️ ${msg}`);
@@ -170,6 +186,8 @@
           updateUserCount(data.count);
         } else if (data.type === 'system') {
           addSystemMessage(data.message);
+        } else if (data.type === 'clear' || data.type === 'chat_cleared') {
+          clearMessages();
         }
       } catch (e) {}
     });
@@ -182,10 +200,14 @@
 
   // --- Actions ---
   function joinChat(name, house) {
+    // Si el nombre lleva ALTA, asegurar que sea la casa secreta ALTA
+    const finalHouse = name.toUpperCase().includes('ALTA') ? 'ALTA' : house;
+    selectedHouse = finalHouse;
+
     if (isSocketIO && socket) {
-      socket.emit('join', { name, house });
+      socket.emit('join', { name, house: finalHouse });
     } else if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'join', nickname: name, house }));
+      ws.send(JSON.stringify({ type: 'join', nickname: name, house: finalHouse }));
     }
 
     if (chatJoinForm) chatJoinForm.hidden = true;
@@ -194,14 +216,17 @@
       chatInput.focus();
     }
 
-    addSystemMessage(`✨ ¡Bienvenido/a a la sala común de ${house}, ${name}!`);
+    const houseLabel = finalHouse === 'ALTA' ? 'la misteriosa Orden ALTA' : `la sala común de ${finalHouse}`;
+    addSystemMessage(`✨ ¡Bienvenido/a a ${houseLabel}, ${name}!`);
   }
 
   function sendMessage(text) {
-    const houseInfo = HOUSES[selectedHouse] || HOUSES.Gryffindor;
+    const finalHouse = (nickname.toUpperCase().includes('ALTA') || selectedHouse === 'ALTA') ? 'ALTA' : selectedHouse;
+    const houseInfo = HOUSES[finalHouse] || HOUSES.Gryffindor;
+
     const payload = {
       name: nickname,
-      house: selectedHouse,
+      house: finalHouse,
       color: houseInfo.color,
       text: text,
       timestamp: Date.now(),
@@ -210,13 +235,12 @@
     if (isSocketIO && socket) {
       socket.emit('message', payload);
     } else if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'message', text, house: selectedHouse, color: houseInfo.color }));
+      ws.send(JSON.stringify({ type: 'message', text, house: finalHouse, color: houseInfo.color }));
     }
   }
 
   // --- Rendering ---
   function renderMessage(msg, animate) {
-    // Unique key to prevent duplicates
     const author = msg.name || msg.nickname || 'Anónimo';
     const text = msg.text || '';
     const time = msg.timestamp || 0;
@@ -229,15 +253,21 @@
     el.classList.add('chat-msg');
     if (animate) el.style.animation = 'fadeInUp 0.2s ease';
 
-    const houseName = msg.house || 'Gryffindor';
-    const houseInfo = HOUSES[houseName] || { color: msg.color || '#a78bfa', badge: houseName, class: 'general' };
+    // Determinar si es ALTA (por nombre o propiedad house)
+    const isAlta = author.toUpperCase().includes('ALTA') || (msg.house && msg.house.toUpperCase() === 'ALTA');
+    const houseKey = isAlta ? 'ALTA' : (msg.house || 'Gryffindor');
+    const houseInfo = HOUSES[houseKey] || { color: msg.color || '#a78bfa', badge: houseKey, class: 'general' };
+    const houseClass = (houseInfo.class || 'general').toLowerCase();
+
+    el.classList.add(`chat-msg--${houseClass}`);
+
     const timeStr = time ? formatTime(time) : '';
     const isMe = author === nickname;
 
     el.innerHTML = `
       <div class="chat-msg__header">
-        <span class="chat-msg__house-badge chat-msg__house-badge--${(houseInfo.class || 'general').toLowerCase()}">${escapeHtml(houseInfo.badge || houseName)}</span>
-        <span class="chat-msg__nickname" style="color: ${msg.color || houseInfo.color}">${escapeHtml(author)}${isMe ? ' (tú)' : ''}</span>
+        <span class="chat-msg__house-badge chat-msg__house-badge--${houseClass}">${escapeHtml(houseInfo.badge || houseKey)}</span>
+        <span class="chat-msg__nickname" style="color: ${houseInfo.color}">${escapeHtml(author)}${isMe ? ' (tú)' : ''}</span>
         <span class="chat-msg__time">${timeStr}</span>
       </div>
       <div class="chat-msg__text">${formatMessageText(text)}</div>
@@ -259,6 +289,12 @@
     if (autoScroll) {
       scrollToBottom();
     }
+  }
+
+  function clearMessages() {
+    renderedMessageIds.clear();
+    chatMessages.innerHTML = '';
+    addSystemMessage('🧹 El chat ha sido vaciado por un administrador.');
   }
 
   function updateUserCount(count) {

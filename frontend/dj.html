@@ -111,11 +111,28 @@
         gap: 0.75rem;
       }
       .dj-lechuzas {
-        max-height: 320px;
+        max-height: 280px;
         overflow-y: auto;
         display: flex;
         flex-direction: column;
         gap: 0.6rem;
+      }
+      .dj-schedule-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        max-height: 240px;
+        overflow-y: auto;
+      }
+      .dj-schedule-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.6rem 0.8rem;
+        background: rgba(10, 10, 26, 0.5);
+        border-radius: var(--radius-sm);
+        border-left: 3px solid var(--purple-500);
+        font-size: 0.85rem;
       }
     </style>
 </head>
@@ -172,23 +189,38 @@
                         ✨ Al conectarte, AzuraCast realiza crossfade suave y atenúa el AutoDJ para que salgas al aire con el audio directo de tu tarjeta de sonido.
                     </p>
                 </div>
+
+                <!-- Programación de Shows -->
+                <div class="dj-card">
+                    <h2 class="dj-card__title">📅 Programación de Shows</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+                        La programación pública se sincroniza automáticamente con AzuraCast o la lista de programas:
+                    </p>
+                    <div id="dj-schedule-list" class="dj-schedule-list">
+                        <div style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 1rem;">Cargando programación...</div>
+                    </div>
+                    <div style="border-top: 1px solid var(--glass-border); padding-top: 0.75rem;">
+                        <a href="https://panel.wizardfm.lat/station/1/playlists" target="_blank" rel="noopener" class="btn btn--outline" style="width: 100%; font-size: 0.85rem; justify-content: center;">
+                            ⚙️ Configurar Horarios en AzuraCast ↗
+                        </a>
+                    </div>
+                </div>
             </div>
 
-            <!-- Columna 2: Importador & Lechuzas -->
+            <!-- Columna 2: Importador, Moderación & Lechuzas -->
             <div style="display: flex; flex-direction: column; gap: 2rem;">
-                <!-- Importador Mágico -->
-                <div class="dj-card">
-                    <h2 class="dj-card__title">🪄 Importador Mágico de Música</h2>
-                    <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">
-                        Pega un enlace de <strong>YouTube</strong> o <strong>Spotify</strong> para descargar e incorporar canciones a la biblioteca de AzuraCast automáticamente:
+                <!-- Moderación del Chat -->
+                <div class="dj-card" style="border-color: rgba(239, 68, 68, 0.35); background: rgba(25, 10, 25, 0.65);">
+                    <h2 class="dj-card__title" style="color: #fca5a5;">
+                        🧹 Moderación y Limpieza del Chat
+                    </h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.4;">
+                        Vacía de inmediato el historial de mensajes de la sala común para todos los oyentes de la radio:
                     </p>
-                    <form id="dj-import-form" class="dj-import-form">
-                        <input type="text" id="dj-import-url" class="chat__input" placeholder="Ej. https://www.youtube.com/watch?v=... o Spotify URL" required>
-                        <button type="submit" id="dj-import-submit" class="btn btn--primary" style="width: 100%;">
-                            Descargar e Importar a la Radio ✨
-                        </button>
-                    </form>
-                    <div id="dj-import-msg" style="font-size: 0.85rem; padding: 0.5rem; border-radius: var(--radius-sm); display: none;"></div>
+                    <button type="button" id="dj-clear-chat-btn" class="btn btn--outline" style="border-color: #ef4444; color: #fca5a5; width: 100%; justify-content: center; font-weight: 600;">
+                        🗑️ Vaciar Todo el Chat en Vivo
+                    </button>
+                    <div id="dj-clear-status" style="font-size: 0.85rem; padding: 0.6rem; border-radius: var(--radius-sm); display: none; text-align: center;"></div>
                 </div>
 
                 <!-- Buzón de Lechuzas -->
@@ -202,6 +234,21 @@
                             Esperando mensajes de los oyentes... 🦉✨
                         </div>
                     </div>
+                </div>
+
+                <!-- Importador Mágico -->
+                <div class="dj-card">
+                    <h2 class="dj-card__title">🪄 Importador Mágico de Música</h2>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5;">
+                        Pega un enlace de <strong>YouTube</strong> o <strong>Spotify</strong> para descargar e incorporar canciones a la biblioteca de AzuraCast automáticamente:
+                    </p>
+                    <form id="dj-import-form" class="dj-import-form">
+                        <input type="text" id="dj-import-url" class="chat__input" placeholder="Ej. https://www.youtube.com/watch?v=... o Spotify URL" required>
+                        <button type="submit" id="dj-import-submit" class="btn btn--primary" style="width: 100%;">
+                            Descargar e Importar a la Radio ✨
+                        </button>
+                    </form>
+                    <div id="dj-import-msg" style="font-size: 0.85rem; padding: 0.5rem; border-radius: var(--radius-sm); display: none;"></div>
                 </div>
             </div>
         </div>

@@ -58,6 +58,7 @@
     setupEventListeners();
     createParticles();
     fetchNowPlaying();
+    loadSchedule();
     startPolling();
     registerServiceWorker();
   }
@@ -431,6 +432,61 @@
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  // --- Dynamic Shows Schedule ---
+  async function loadSchedule() {
+    const showsList = document.getElementById('shows-list');
+    if (!showsList) return;
+
+    try {
+      let shows = [];
+
+      // 1. Check AzuraCast schedule API
+      try {
+        const azRes = await fetch(`${CONFIG.AZURACAST_API_URL}/api/station/${CONFIG.STATION_ID}/schedule`);
+        if (azRes.ok) {
+          const azData = await azRes.json();
+          if (Array.isArray(azData) && azData.length > 0) {
+            shows = azData.map((item) => ({
+              days: item.start ? new Date(item.start).toLocaleDateString('es', { weekday: 'short' }).toUpperCase() : 'HOY',
+              time: item.start ? new Date(item.start).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '00:00',
+              name: item.name || 'Emisión Especial',
+              desc: item.type === 'streamer' ? 'Transmisión en vivo por locutor' : 'Selección musical mágica AutoDJ',
+              host: item.type === 'streamer' ? 'Locutor en Vivo' : 'AutoDJ',
+            }));
+          }
+        }
+      } catch (e) {}
+
+      // 2. Fallback to schedule.json
+      if (shows.length === 0) {
+        const jsonRes = await fetch('/data/schedule.json');
+        if (jsonRes.ok) {
+          shows = await jsonRes.json();
+        }
+      }
+
+      if (shows.length > 0) {
+        showsList.innerHTML = shows
+          .map(
+            (s) => `
+          <div class="show-card">
+            <div class="show-card__time">${escapeHtml(s.days || 'LUN - DOM')}</div>
+            <div class="show-card__info">
+              <h3 class="show-card__name">${escapeHtml(s.name)}</h3>
+              <p class="show-card__desc">${escapeHtml(s.desc || '')}</p>
+              <span class="show-card__host">${escapeHtml(s.host || '')}</span>
+            </div>
+            <span class="show-card__hour">${escapeHtml(s.time || '')}</span>
+          </div>
+        `
+          )
+          .join('');
+      }
+    } catch (err) {
+      console.warn('Could not load dynamic schedule:', err);
+    }
   }
 
   // --- Expose for other modules ---

@@ -1,12 +1,12 @@
-FROM node:20-alpine
+FROM node:18-alpine
 
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --production
+RUN npm install --production
 
 COPY . .
 
 EXPOSE 3001
 
-CMD ["node", "chat-server.js"]
+CMD ["node", "server.js"]
