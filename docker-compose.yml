@@ -15,8 +15,10 @@ services:
     depends_on:
       - chat
     networks:
-      - default
-      - coolify
+      default:
+      coolify:
+        aliases:
+          - wizardfm-frontend
 
   chat:
     build:
@@ -34,8 +36,10 @@ services:
       - chat_data:/app/data
     restart: unless-stopped
     networks:
-      - default
-      - coolify
+      default:
+      coolify:
+        aliases:
+          - wizardfm-chat
 
 networks:
   default:
