@@ -50,6 +50,9 @@
   let pollTimer = null;
   let songHistory = [];
   let sseSource = null;
+  let currentTrackKey = '';
+  let currentTrackCoverUrl = null;
+  const coverCache = new Map();
 
   // --- Initialize ---
   function init() {
@@ -309,7 +312,8 @@
     }
 
     const hasValidSong = Boolean(title && title !== 'Station Offline');
-    const art = song?.art || (isDJLive ? nowPlayingData.live?.art : null) || '/assets/icons/icon-512.png';
+    const songArt = song?.art && !song?.art.includes('generic_song') ? song.art : null;
+    const art = currentTrackCoverUrl || songArt || (isDJLive ? nowPlayingData.live?.art : null) || '/assets/icons/icon-512.png';
 
     if (hasValidSong) {
       const album = isDJLive
@@ -385,6 +389,58 @@
     } catch (err) {
       console.warn('Failed to fetch now playing:', err.message);
       // Keep last known state on network error
+    }
+  }
+
+  // --- iTunes / Apple Music Album Art API ---
+  async function fetchTrackCover(artist, title) {
+    const rawArtist = (artist || '').trim();
+    const rawTitle = (title || '').trim();
+    if (!rawTitle || rawTitle === 'WizardFM' || rawTitle === 'Station Offline') {
+      return null;
+    }
+
+    const cleanArtist = (!rawArtist || rawArtist.toLowerCase() === 'desconocido' || rawArtist.toLowerCase() === 'unknown' || rawArtist.toLowerCase() === 'wizardfm') ? '' : rawArtist;
+    const cleanTitle = rawTitle.replace(/\((official\s*(video|audio)|video\s*oficial|audio\s*oficial|lyric\s*video|en\s*vivo|remastered|remaster)\)/gi, '').trim();
+    const term = `${cleanArtist} ${cleanTitle}`.trim();
+
+    if (!term) return null;
+
+    const cacheKey = `${cleanArtist.toLowerCase()} - ${cleanTitle.toLowerCase()}`;
+    if (coverCache.has(cacheKey)) {
+      return coverCache.get(cacheKey);
+    }
+
+    try {
+      const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=song&limit=1`;
+      const res = await fetch(itunesUrl);
+      if (!res.ok) throw new Error(`iTunes HTTP ${res.status}`);
+      const json = await res.json();
+
+      if (json.results && json.results.length > 0 && json.results[0].artworkUrl100) {
+        const cover600 = json.results[0].artworkUrl100.replace('100x100bb', '600x600bb');
+        coverCache.set(cacheKey, cover600);
+        return cover600;
+      }
+    } catch (err) {
+      console.warn('No se pudo obtener la carátula de iTunes:', err.message);
+    }
+
+    coverCache.set(cacheKey, null);
+    return null;
+  }
+
+  function renderAlbumArt(artUrl, title, isLiveStationArt = false) {
+    if (artUrl) {
+      const currentImg = albumArt.querySelector('img');
+      if (!currentImg || currentImg.getAttribute('src') !== artUrl) {
+        const extraClass = isLiveStationArt ? ' class="player-card__art-img--live"' : '';
+        albumArt.innerHTML = `<img src="${escapeHtml(artUrl)}" alt="${escapeHtml(title || 'Portada')}"${extraClass} loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'player-card__art-placeholder\\'><span>🧙‍♂️</span></div>';">`;
+      }
+    } else {
+      if (!albumArt.querySelector('.player-card__art-placeholder')) {
+        albumArt.innerHTML = '<div class="player-card__art-placeholder"><span>🧙‍♂️</span></div>';
+      }
     }
   }
 
@@ -486,21 +542,53 @@
       trackArtist.textContent = displayArtist;
     }
 
-    // Album Art
-    if (hasValidSong && songArt) {
-      const currentImg = albumArt.querySelector('img');
-      if (!currentImg || currentImg.getAttribute('src') !== songArt) {
-        albumArt.innerHTML = `<img src="${escapeHtml(songArt)}" alt="${escapeHtml(displayTitle)}" loading="lazy" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'player-card__art-placeholder\\'><span>🧙‍♂️</span></div>';">`;
-      }
-    } else if (isDJLive && data.live?.art) {
-      const currentImg = albumArt.querySelector('img');
-      if (!currentImg || currentImg.getAttribute('src') !== data.live.art) {
-        albumArt.innerHTML = `<img src="${escapeHtml(data.live.art)}" alt="En Vivo" class="player-card__art-img--live" loading="lazy">`;
+    // Album Art Resolution (iTunes cover with radio default fallback)
+    const itunesArtist = (songArtist && songArtist.toLowerCase() !== 'desconocido' && songArtist.toLowerCase() !== 'unknown') ? songArtist : '';
+    const trackKey = `${itunesArtist} - ${displayTitle}`.trim().toLowerCase();
+
+    if (hasValidSong) {
+      const hasCustomRadioArt = songArt && !songArt.includes('generic_song');
+      const defaultRadioArt = hasCustomRadioArt ? songArt : (isDJLive ? data.live?.art : null);
+
+      if (currentTrackKey !== trackKey) {
+        currentTrackKey = trackKey;
+        const cachedCover = coverCache.get(trackKey);
+
+        if (cachedCover) {
+          currentTrackCoverUrl = cachedCover;
+          renderAlbumArt(cachedCover, displayTitle, false);
+        } else if (cachedCover === null) {
+          // Ya consultado previamente sin resultado en iTunes -> mantener carátula por defecto de la radio
+          currentTrackCoverUrl = defaultRadioArt;
+          renderAlbumArt(defaultRadioArt, displayTitle, !hasCustomRadioArt && isDJLive);
+        } else {
+          // Primera vez que suena: mostrar imagen por defecto de inmediato y consultar iTunes en background
+          renderAlbumArt(defaultRadioArt, displayTitle, !hasCustomRadioArt && isDJLive);
+          currentTrackCoverUrl = defaultRadioArt;
+
+          fetchTrackCover(itunesArtist, displayTitle).then((itunesCover) => {
+            if (currentTrackKey === trackKey) {
+              if (itunesCover) {
+                currentTrackCoverUrl = itunesCover;
+                renderAlbumArt(itunesCover, displayTitle, false);
+                syncMediaSessionState();
+              } else {
+                currentTrackCoverUrl = defaultRadioArt;
+              }
+            }
+          });
+        }
+      } else {
+        // Misma canción en curso: asegurar renderizado sin parpadeos
+        if (currentTrackCoverUrl) {
+          renderAlbumArt(currentTrackCoverUrl, displayTitle, currentTrackCoverUrl === data.live?.art);
+        }
       }
     } else {
-      if (!albumArt.querySelector('.player-card__art-placeholder')) {
-        albumArt.innerHTML = '<div class="player-card__art-placeholder"><span>🧙‍♂️</span></div>';
-      }
+      currentTrackKey = '';
+      currentTrackCoverUrl = null;
+      const defaultArt = isDJLive ? data.live?.art : null;
+      renderAlbumArt(defaultArt, displayTitle, Boolean(defaultArt));
     }
 
     // Page Title
