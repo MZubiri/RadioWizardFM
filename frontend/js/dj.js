@@ -43,7 +43,24 @@
   const modalDeleteConfirm = $('#modal-delete-confirm');
   const modalDeleteText = $('#modal-delete-text');
 
-  let pendingDeleteId = null;
+  // Auth Elements
+  const modalAuth = $('#modal-auth');
+  const formDjLogin = $('#form-dj-login');
+  const inputDjPassword = $('#input-dj-password');
+  const btnToggleShowPass = $('#btn-toggle-show-pass');
+  const authErrorMsg = $('#auth-error-msg');
+  const btnDjLoginSubmit = $('#btn-dj-login-submit');
+  const btnDjLogout = $('#btn-dj-logout');
+
+  const formChangePassword = $('#form-change-password');
+  const inputCurrentPass = $('#input-current-pass');
+  const inputNewPass = $('#input-new-pass');
+  const inputConfirmPass = $('#input-confirm-pass');
+  const changePassStatus = $('#change-pass-status');
+  const btnSubmitChangePass = $('#btn-submit-change-pass');
+
+  const AUTH_STORAGE_KEY = 'wizardfm_dj_token';
+  let servicesStarted = false;
 
   const API_NOWPLAYING = 'https://panel.wizardfm.lat/api/nowplaying/wizardfm';
   let chatSocket = null;
@@ -51,15 +68,224 @@
   let scheduleEvents = [];
 
   // --- Initialize ---
-  function init() {
+  async function init() {
     setupTabs();
+    setupAuth();
+    setupChangePassword();
+    setupScheduleCrud();
+
+    const isAuthed = await checkAuth();
+    if (isAuthed) {
+      startPanelServices();
+    }
+  }
+
+  function startPanelServices() {
+    if (servicesStarted) return;
+    servicesStarted = true;
     fetchStatus();
     setInterval(fetchStatus, 8000);
     connectChatListener();
     setupImportForm();
     setupClearChat();
-    setupScheduleCrud();
     loadCrudSchedule();
+  }
+
+  // --- Auth & Session Logic ---
+  async function checkAuth() {
+    const token = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!token) {
+      lockPanel();
+      return false;
+    }
+
+    try {
+      const res = await fetch('/api/dj/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        if (data.valid) {
+          unlockPanel();
+          return true;
+        }
+      }
+    } catch (e) {
+      console.warn('Error verificando sesión DJ:', e);
+    }
+
+    lockPanel();
+    return false;
+  }
+
+  function lockPanel() {
+    localStorage.removeItem(AUTH_STORAGE_KEY);
+    if (modalAuth) {
+      modalAuth.classList.add('active');
+      modalAuth.setAttribute('aria-hidden', 'false');
+    }
+    const container = $('.dj-container');
+    if (container) {
+      container.style.filter = 'blur(12px)';
+      container.style.pointerEvents = 'none';
+      container.style.userSelect = 'none';
+    }
+  }
+
+  function unlockPanel() {
+    if (modalAuth) {
+      modalAuth.classList.remove('active');
+      modalAuth.setAttribute('aria-hidden', 'true');
+    }
+    const container = $('.dj-container');
+    if (container) {
+      container.style.filter = 'none';
+      container.style.pointerEvents = 'auto';
+      container.style.userSelect = 'auto';
+    }
+    if (authErrorMsg) {
+      authErrorMsg.style.display = 'none';
+    }
+  }
+
+  function setupAuth() {
+    if (formDjLogin) {
+      formDjLogin.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const password = inputDjPassword ? inputDjPassword.value.trim() : '';
+        if (!password) return;
+
+        btnDjLoginSubmit.disabled = true;
+        btnDjLoginSubmit.textContent = 'Verificando... 🗝️';
+        if (authErrorMsg) authErrorMsg.style.display = 'none';
+
+        try {
+          const res = await fetch('/api/dj/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+          });
+
+          const data = await res.json();
+          if (res.ok && data.success) {
+            localStorage.setItem(AUTH_STORAGE_KEY, data.token);
+            unlockPanel();
+            if (inputDjPassword) inputDjPassword.value = '';
+            startPanelServices();
+          } else {
+            if (authErrorMsg) {
+              authErrorMsg.style.display = 'block';
+              authErrorMsg.textContent = `⚠️ ${data.error || 'Contraseña mágica incorrecta'}`;
+            }
+          }
+        } catch (err) {
+          if (authErrorMsg) {
+            authErrorMsg.style.display = 'block';
+            authErrorMsg.textContent = '⚠️ Error de conexión con el servidor.';
+          }
+        } finally {
+          btnDjLoginSubmit.disabled = false;
+          btnDjLoginSubmit.textContent = 'Desbloquear Cabina ✨';
+        }
+      });
+    }
+
+    if (btnToggleShowPass && inputDjPassword) {
+      btnToggleShowPass.addEventListener('click', () => {
+        const isPass = inputDjPassword.type === 'password';
+        inputDjPassword.type = isPass ? 'text' : 'password';
+        btnToggleShowPass.textContent = isPass ? '🔒' : '👁️';
+      });
+    }
+
+    if (btnDjLogout) {
+      btnDjLogout.addEventListener('click', () => {
+        const confirmLogout = confirm('¿Deseas cerrar la sesión de cabina y bloquear el panel?');
+        if (!confirmLogout) return;
+        lockPanel();
+      });
+    }
+  }
+
+  function setupChangePassword() {
+    if (!formChangePassword) return;
+
+    formChangePassword.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const currentPassword = inputCurrentPass ? inputCurrentPass.value : '';
+      const newPassword = inputNewPass ? inputNewPass.value : '';
+      const confirmPassword = inputConfirmPass ? inputConfirmPass.value : '';
+
+      if (!currentPassword || !newPassword) {
+        showChangePassMsg('Todos los campos marcados con * son obligatorios', 'error');
+        return;
+      }
+
+      if (newPassword !== confirmPassword) {
+        showChangePassMsg('La confirmación de la contraseña no coincide', 'error');
+        return;
+      }
+
+      if (newPassword.trim().length < 4) {
+        showChangePassMsg('La nueva contraseña debe tener al menos 4 caracteres', 'error');
+        return;
+      }
+
+      btnSubmitChangePass.disabled = true;
+      btnSubmitChangePass.textContent = 'Guardando nueva clave... ⏳';
+
+      try {
+        const token = localStorage.getItem(AUTH_STORAGE_KEY);
+        const res = await fetch('/api/dj/change-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            currentPassword,
+            newPassword: newPassword.trim(),
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (data.token) {
+            localStorage.setItem(AUTH_STORAGE_KEY, data.token);
+          }
+          showChangePassMsg('✨ ¡Contraseña actualizada exitosamente! La nueva clave ya está activa.', 'success');
+          formChangePassword.reset();
+        } else {
+          showChangePassMsg(`⚠️ ${data.error || 'No se pudo actualizar la contraseña'}`, 'error');
+        }
+      } catch (err) {
+        showChangePassMsg('⚠️ Error de comunicación con el servidor.', 'error');
+      } finally {
+        btnSubmitChangePass.disabled = false;
+        btnSubmitChangePass.textContent = '💾 Actualizar Contraseña Mágica';
+      }
+    });
+  }
+
+  function showChangePassMsg(msg, type) {
+    if (!changePassStatus) return;
+    changePassStatus.style.display = 'block';
+    changePassStatus.style.background = type === 'success' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+    changePassStatus.style.border = type === 'success' ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)';
+    changePassStatus.style.color = type === 'success' ? '#4ade80' : '#f87171';
+    changePassStatus.textContent = msg;
+
+    if (type === 'success') {
+      setTimeout(() => {
+        changePassStatus.style.display = 'none';
+      }, 6000);
+    }
   }
 
   // --- Tab Navigation ---
@@ -132,6 +358,11 @@
       chatSocket = window.io({
         path: '/socket.io',
         transports: ['websocket', 'polling'],
+      });
+
+      chatSocket.on('connect', () => {
+        console.log('🦉 Cabina conectada al chat de oyentes');
+        chatSocket.emit('join', { name: 'Cabina Locutor 🎙️', house: 'ALTA' });
       });
 
       const handleMsg = (msg) => {

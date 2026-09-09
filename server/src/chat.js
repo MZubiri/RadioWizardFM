@@ -10,6 +10,9 @@ export function handleConnection(io, socket) {
   io.emit('userCount', userCount);
   console.log(`User connected: ${socket.id}. Total users: ${userCount}`);
 
+  // Send message history immediately to any connecting socket (listeners & DJ panel)
+  socket.emit('history', messageHistory);
+
   socket.on('join', (userData) => {
     try {
       if (!userData || !userData.name || !userData.house) {
@@ -17,7 +20,7 @@ export function handleConnection(io, socket) {
         return;
       }
 
-      // Send history to the new user
+      // Also confirm history on join
       socket.emit('history', messageHistory);
     } catch (err) {
       console.error('Error in join event:', err);

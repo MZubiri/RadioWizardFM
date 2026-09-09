@@ -27,4 +27,9 @@ services:
       - MAX_HISTORY=${MAX_HISTORY:-100}
       - RATE_LIMIT_MS=${RATE_LIMIT_MS:-1000}
       - MAX_MESSAGE_LENGTH=${MAX_MESSAGE_LENGTH:-500}
+    volumes:
+      - chat_data:/app/data
     restart: unless-stopped
+
+volumes:
+  chat_data:

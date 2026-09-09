@@ -5,16 +5,53 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import crypto from 'crypto';
 import { handleConnection } from './src/chat.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const DATA_DIR = path.join(__dirname, 'data');
 const SCHEDULE_FILE = path.join(DATA_DIR, 'schedule.json');
+const AUTH_FILE = path.join(DATA_DIR, 'auth.json');
+const DEFAULT_PASSWORD = 'ElMatadero';
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+function readAuth() {
+  try {
+    if (!fs.existsSync(AUTH_FILE)) {
+      const initial = { password: DEFAULT_PASSWORD };
+      fs.writeFileSync(AUTH_FILE, JSON.stringify(initial, null, 2));
+      return initial;
+    }
+    const data = fs.readFileSync(AUTH_FILE, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed?.password ? parsed : { password: DEFAULT_PASSWORD };
+  } catch (err) {
+    console.error('Error reading auth file:', err);
+    return { password: DEFAULT_PASSWORD };
+  }
+}
+
+function writeAuth(data) {
+  try {
+    fs.writeFileSync(AUTH_FILE, JSON.stringify(data, null, 2));
+    return true;
+  } catch (err) {
+    console.error('Error writing auth file:', err);
+    return false;
+  }
+}
+
+const activeTokens = new Set();
+
+function generateToken() {
+  const token = crypto.randomBytes(24).toString('hex');
+  activeTokens.add(token);
+  return token;
 }
 
 // Initial default shows if file does not exist
@@ -161,6 +198,67 @@ app.delete('/api/schedule/:id', (req, res) => {
 
   writeSchedule(schedule);
   res.json({ message: 'Evento eliminado correctamente', id });
+});
+
+// --- DJ Panel Authentication Endpoints ---
+app.post('/api/dj/login', (req, res) => {
+  const { password } = req.body || {};
+  if (!password) {
+    return res.status(400).json({ error: 'La contraseña es requerida' });
+  }
+
+  const auth = readAuth();
+  if (password === auth.password) {
+    const token = generateToken();
+    return res.json({ success: true, token, message: 'Acceso concedido a la cabina' });
+  }
+
+  return res.status(401).json({ error: 'Contraseña mágica incorrecta' });
+});
+
+app.post('/api/dj/verify', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = (authHeader && authHeader.startsWith('Bearer '))
+    ? authHeader.slice(7)
+    : (req.body && req.body.token);
+
+  if (token && activeTokens.has(token)) {
+    return res.json({ valid: true });
+  }
+
+  return res.status(401).json({ valid: false, error: 'Sesión no válida o expirada' });
+});
+
+app.post('/api/dj/change-password', (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'La contraseña actual y la nueva son obligatorias' });
+  }
+
+  if (newPassword.trim().length < 4) {
+    return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 4 caracteres' });
+  }
+
+  const auth = readAuth();
+  if (currentPassword !== auth.password) {
+    return res.status(401).json({ error: 'La contraseña actual es incorrecta' });
+  }
+
+  const updated = writeAuth({ password: newPassword.trim() });
+  if (!updated) {
+    return res.status(500).json({ error: 'No se pudo guardar la nueva contraseña' });
+  }
+
+  // Clear existing tokens and create fresh one
+  activeTokens.clear();
+  const token = generateToken();
+
+  return res.json({
+    success: true,
+    message: 'Contraseña actualizada exitosamente',
+    token,
+  });
 });
 
 // Handle Socket.io connections
