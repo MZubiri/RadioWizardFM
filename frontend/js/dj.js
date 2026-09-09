@@ -18,7 +18,7 @@
   const djClearChatBtn = $('#dj-clear-chat-btn');
   const djClearStatus = $('#dj-clear-status');
 
-  // CRUD Elements
+  // CRUD & Modal Elements
   const crudForm = $('#crud-show-form');
   const crudFormTitle = $('#crud-form-title');
   const crudShowId = $('#crud-show-id');
@@ -28,10 +28,22 @@
   const crudHost = $('#crud-host');
   const crudDesc = $('#crud-desc');
   const crudSubmitBtn = $('#crud-submit-btn');
-  const crudCancelBtn = $('#crud-cancel-btn');
   const crudStatusMsg = $('#crud-status-msg');
   const crudShowsContainer = $('#crud-shows-container');
   const crudCountBadge = $('#crud-count-badge');
+
+  const modalShow = $('#modal-show');
+  const modalShowClose = $('#modal-show-close');
+  const modalShowCancel = $('#modal-show-cancel');
+  const btnOpenCreateShow = $('#btn-open-create-show');
+
+  const modalDelete = $('#modal-delete');
+  const modalDeleteClose = $('#modal-delete-close');
+  const modalDeleteCancel = $('#modal-delete-cancel');
+  const modalDeleteConfirm = $('#modal-delete-confirm');
+  const modalDeleteText = $('#modal-delete-text');
+
+  let pendingDeleteId = null;
 
   const API_NOWPLAYING = 'https://panel.wizardfm.lat/api/nowplaying/wizardfm';
   let chatSocket = null;
@@ -214,57 +226,154 @@
     });
   }
 
-  // --- Schedule CRUD Logic ---
+  // --- Schedule CRUD Logic (Modal-Based) ---
   function setupScheduleCrud() {
-    if (!crudForm) return;
+    // Open Create Modal
+    if (btnOpenCreateShow) {
+      btnOpenCreateShow.addEventListener('click', openCreateModal);
+    }
 
-    // Form submit (Create or Update)
-    crudForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const id = crudShowId.value.trim();
-      const name = crudName.value.trim();
-      const days = crudDays.value.trim();
-      const time = crudTime.value.trim();
-      const host = crudHost.value.trim();
-      const desc = crudDesc.value.trim();
+    // Close Show Modal
+    if (modalShowClose) modalShowClose.addEventListener('click', closeShowModal);
+    if (modalShowCancel) modalShowCancel.addEventListener('click', closeShowModal);
 
-      if (!name || !days || !time) return;
+    // Close Delete Modal
+    if (modalDeleteClose) modalDeleteClose.addEventListener('click', closeDeleteModal);
+    if (modalDeleteCancel) modalDeleteCancel.addEventListener('click', closeDeleteModal);
 
-      crudSubmitBtn.disabled = true;
-      crudSubmitBtn.textContent = 'Guardando... ✨';
+    // Overlay clicks close modals
+    window.addEventListener('click', (e) => {
+      if (e.target === modalShow) closeShowModal();
+      if (e.target === modalDelete) closeDeleteModal();
+    });
 
-      const payload = { name, days, time, host, desc };
-      const isEditing = Boolean(id);
-      const url = isEditing ? `/api/schedule/${encodeURIComponent(id)}` : '/api/schedule';
-      const method = isEditing ? 'PUT' : 'POST';
-
-      try {
-        const res = await fetch(url, {
-          method,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.ok) {
-          showCrudStatus(`✨ Show ${isEditing ? 'actualizado' : 'creado'} con éxito.`, 'success');
-          resetCrudForm();
-          await loadCrudSchedule();
-        } else {
-          const errData = await res.json();
-          showCrudStatus(`⚠️ Error: ${errData.error || 'No se pudo guardar'}`, 'error');
-        }
-      } catch (err) {
-        showCrudStatus('⚠️ Error de conexión con el servidor.', 'error');
-      } finally {
-        crudSubmitBtn.disabled = false;
-        crudSubmitBtn.textContent = isEditing ? 'Actualizar Show ✨' : 'Guardar Show ✨';
+    // Escape key closes modals
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeShowModal();
+        closeDeleteModal();
       }
     });
 
-    // Cancel edit button
-    if (crudCancelBtn) {
-      crudCancelBtn.addEventListener('click', resetCrudForm);
+    // Confirm Delete Click
+    if (modalDeleteConfirm) {
+      modalDeleteConfirm.addEventListener('click', async () => {
+        if (!pendingDeleteId) return;
+
+        modalDeleteConfirm.disabled = true;
+        modalDeleteConfirm.textContent = 'Eliminando... ⏳';
+
+        try {
+          const res = await fetch(`/api/schedule/${encodeURIComponent(pendingDeleteId)}`, {
+            method: 'DELETE',
+          });
+
+          if (res.ok) {
+            closeDeleteModal();
+            showCrudStatus('🗑️ Show eliminado correctamente de la programación.', 'success');
+            await loadCrudSchedule();
+          } else {
+            showCrudStatus('⚠️ Error al eliminar el show.', 'error');
+          }
+        } catch (e) {
+          showCrudStatus('⚠️ Error de conexión con el servidor.', 'error');
+        } finally {
+          modalDeleteConfirm.disabled = false;
+          modalDeleteConfirm.textContent = 'Sí, Eliminar 🗑️';
+        }
+      });
     }
+
+    // Form submit (Create or Update)
+    if (crudForm) {
+      crudForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const id = crudShowId.value.trim();
+        const name = crudName.value.trim();
+        const days = crudDays.value.trim();
+        const time = crudTime.value.trim();
+        const host = crudHost.value.trim();
+        const desc = crudDesc.value.trim();
+
+        if (!name || !days || !time) return;
+
+        crudSubmitBtn.disabled = true;
+        crudSubmitBtn.textContent = 'Guardando... ✨';
+
+        const payload = { name, days, time, host, desc };
+        const isEditing = Boolean(id);
+        const url = isEditing ? `/api/schedule/${encodeURIComponent(id)}` : '/api/schedule';
+        const method = isEditing ? 'PUT' : 'POST';
+
+        try {
+          const res = await fetch(url, {
+            method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+
+          if (res.ok) {
+            closeShowModal();
+            showCrudStatus(`✨ Show ${isEditing ? 'actualizado' : 'creado'} con éxito.`, 'success');
+            await loadCrudSchedule();
+          } else {
+            const errData = await res.json();
+            showCrudStatus(`⚠️ Error: ${errData.error || 'No se pudo guardar'}`, 'error');
+          }
+        } catch (err) {
+          showCrudStatus('⚠️ Error de conexión con el servidor.', 'error');
+        } finally {
+          crudSubmitBtn.disabled = false;
+          crudSubmitBtn.textContent = isEditing ? 'Actualizar Show ✨' : 'Guardar Show ✨';
+        }
+      });
+    }
+  }
+
+  function openCreateModal() {
+    resetCrudForm();
+    if (crudFormTitle) crudFormTitle.textContent = '✨ Agregar Nuevo Show';
+    if (crudSubmitBtn) crudSubmitBtn.textContent = 'Guardar Show ✨';
+    if (modalShow) modalShow.classList.add('active');
+    setTimeout(() => { if (crudName) crudName.focus(); }, 100);
+  }
+
+  function openEditModal(show) {
+    if (!show) return;
+    crudShowId.value = show.id || '';
+    crudName.value = show.name || '';
+    crudDays.value = show.days || '';
+    crudTime.value = show.time || '';
+    crudHost.value = show.host || '';
+    crudDesc.value = show.desc || '';
+
+    if (crudFormTitle) crudFormTitle.textContent = '✏️ Editar Show';
+    if (crudSubmitBtn) crudSubmitBtn.textContent = 'Actualizar Show ✨';
+    if (modalShow) modalShow.classList.add('active');
+    setTimeout(() => { if (crudName) crudName.focus(); }, 100);
+  }
+
+  function closeShowModal() {
+    if (modalShow) modalShow.classList.remove('active');
+    resetCrudForm();
+  }
+
+  function resetCrudForm() {
+    if (crudShowId) crudShowId.value = '';
+    if (crudForm) crudForm.reset();
+  }
+
+  function openDeleteModal(id, name) {
+    pendingDeleteId = id;
+    if (modalDeleteText) {
+      modalDeleteText.innerHTML = `¿Estás seguro de que deseas eliminar el show <strong style="color: var(--gold-400);">«${escapeHtml(name)}»</strong> de la programación pública? Esta acción no se puede deshacer.`;
+    }
+    if (modalDelete) modalDelete.classList.add('active');
+  }
+
+  function closeDeleteModal() {
+    if (modalDelete) modalDelete.classList.remove('active');
+    pendingDeleteId = null;
   }
 
   async function loadCrudSchedule() {
@@ -296,7 +405,7 @@
     if (shows.length === 0) {
       crudShowsContainer.innerHTML = `
         <div style="text-align: center; color: var(--text-muted); padding: 3rem 0;">
-          No hay shows registrados en la programación. Agrega el primero usando el formulario de la izquierda. ✨
+          No hay shows registrados en la programación. Haz clic en <strong>+ Agregar Nuevo Show</strong> para crear el primero. ✨
         </div>
       `;
       return;
@@ -317,10 +426,10 @@
         </div>
         <div class="crud-item__actions">
           <button type="button" class="btn btn--outline btn-icon edit-btn" title="Editar Show" data-id="${escapeHtml(String(show.id))}">
-            ✏️
+            ✏️ Editar
           </button>
-          <button type="button" class="btn btn--outline btn-icon delete-btn" title="Eliminar Show" data-id="${escapeHtml(String(show.id))}" style="border-color: #ef4444; color: #f87171;">
-            🗑️
+          <button type="button" class="btn btn--outline btn-icon delete-btn" title="Eliminar Show" data-id="${escapeHtml(String(show.id))}" style="border-color: rgba(239, 68, 68, 0.4); color: #f87171;">
+            🗑️ Eliminar
           </button>
         </div>
       </div>
@@ -333,58 +442,18 @@
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
         const show = scheduleEvents.find((s) => String(s.id) === String(id));
-        if (show) startEditShow(show);
+        if (show) openEditModal(show);
       });
     });
 
     crudShowsContainer.querySelectorAll('.delete-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-id');
-        deleteShow(id);
+        const show = scheduleEvents.find((s) => String(s.id) === String(id));
+        const name = show ? show.name : 'este show';
+        openDeleteModal(id, name);
       });
     });
-  }
-
-  function startEditShow(show) {
-    crudShowId.value = show.id;
-    crudName.value = show.name || '';
-    crudDays.value = show.days || '';
-    crudTime.value = show.time || '';
-    crudHost.value = show.host || '';
-    crudDesc.value = show.desc || '';
-
-    crudFormTitle.textContent = '✏️ Editar Show';
-    crudSubmitBtn.textContent = 'Actualizar Show ✨';
-    crudCancelBtn.style.display = 'inline-block';
-    crudName.focus();
-  }
-
-  function resetCrudForm() {
-    crudShowId.value = '';
-    crudForm.reset();
-    crudFormTitle.textContent = '✨ Agregar Nuevo Show';
-    crudSubmitBtn.textContent = 'Guardar Show ✨';
-    crudCancelBtn.style.display = 'none';
-  }
-
-  async function deleteShow(id) {
-    const confirmDelete = confirm('¿Estás seguro de que deseas eliminar este show de la programación?');
-    if (!confirmDelete) return;
-
-    try {
-      const res = await fetch(`/api/schedule/${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
-
-      if (res.ok) {
-        showCrudStatus('🗑️ Show eliminado correctamente.', 'success');
-        await loadCrudSchedule();
-      } else {
-        showCrudStatus('⚠️ Error al eliminar el show.', 'error');
-      }
-    } catch (e) {
-      showCrudStatus('⚠️ Error de conexión.', 'error');
-    }
   }
 
   function showCrudStatus(msg, type) {
