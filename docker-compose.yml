@@ -14,6 +14,9 @@ services:
     restart: unless-stopped
     depends_on:
       - chat
+    networks:
+      - default
+      - coolify
 
   chat:
     build:
@@ -30,6 +33,15 @@ services:
     volumes:
       - chat_data:/app/data
     restart: unless-stopped
+    networks:
+      - default
+      - coolify
+
+networks:
+  default:
+  coolify:
+    name: coolify
+    external: true
 
 volumes:
   chat_data:
