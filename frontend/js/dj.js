@@ -206,8 +206,6 @@
 
     if (btnDjLogout) {
       btnDjLogout.addEventListener('click', () => {
-        const confirmLogout = confirm('¿Deseas cerrar la sesión de cabina y bloquear el panel?');
-        if (!confirmLogout) return;
         lockPanel();
       });
     }
