@@ -68,9 +68,9 @@ WizardFM (este repo)          AzuraCast (instalación separada)
 
 | Variable | Descripción | Default |
 |:---|:---|:---|
-| `AZURACAST_API_URL` | URL base de AzuraCast | `https://radio.wizardfm.lat` |
-| `STREAM_URL` | URL del stream de Icecast | `https://radio.wizardfm.lat/radio` |
-| `STATION_ID` | ID de la estación en AzuraCast | `1` |
+| `AZURACAST_API_URL` | URL base de AzuraCast | `https://panel.wizardfm.lat` |
+| `STREAM_URL` | URL del stream de Icecast | `https://panel.wizardfm.lat/listen/wizardfm/radio.mp3` |
+| `STATION_ID` | ID / Shortcode de la estación en AzuraCast | `wizardfm` |
 | `CHAT_PORT` | Puerto del WebSocket chat | `3001` |
 | `MAX_HISTORY` | Mensajes de chat en memoria | `100` |
 | `RATE_LIMIT_MS` | Rate limit de mensajes (ms) | `1000` |

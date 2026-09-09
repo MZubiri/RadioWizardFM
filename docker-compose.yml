@@ -9,8 +9,8 @@ services:
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     environment:
-      - AZURACAST_API_URL=${AZURACAST_API_URL:-https://radio.wizardfm.lat}
-      - STREAM_URL=${STREAM_URL:-https://radio.wizardfm.lat/radio}
+      - AZURACAST_API_URL=${AZURACAST_API_URL:-https://panel.wizardfm.lat}
+      - STREAM_URL=${STREAM_URL:-https://panel.wizardfm.lat/listen/wizardfm/radio.mp3}
     restart: unless-stopped
     depends_on:
       - chat
