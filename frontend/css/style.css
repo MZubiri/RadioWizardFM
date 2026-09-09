@@ -881,18 +881,32 @@ a:hover { color: var(--purple-300); }
 }
 
 /* Chat forms */
-.chat__join,
+.chat__join {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--glass-border);
+  background: rgba(10, 10, 26, 0.45);
+  width: 100%;
+  box-sizing: border-box;
+}
+
 .chat__form {
   display: flex;
   gap: var(--space-xs);
   padding: var(--space-sm) var(--space-md);
   border-top: 1px solid var(--glass-border);
   width: 100%;
+  box-sizing: border-box;
+  align-items: center;
 }
 
 .chat__input {
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   padding: 0.6rem 0.9rem;
   background: var(--bg-input);
   border: 1px solid var(--glass-border);
@@ -914,13 +928,18 @@ a:hover { color: var(--purple-300); }
 
 .chat__join-inputs {
   display: flex;
-  gap: var(--space-xs);
-  flex: 1;
+  gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.chat__join-inputs .chat__input {
+  flex: 1 1 auto;
   min-width: 0;
 }
 
 .chat__select {
-  padding: 0.6rem 0.75rem;
+  padding: 0.6rem 0.85rem;
   background: var(--bg-input);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-full);
@@ -929,14 +948,23 @@ a:hover { color: var(--purple-300); }
   font-size: 0.82rem;
   outline: none;
   cursor: pointer;
-  flex-shrink: 0;
-  max-width: 150px;
-  min-width: 0;
+  flex: 0 0 auto;
+  max-width: 160px;
+  min-width: 130px;
+  box-sizing: border-box;
   transition: border-color var(--transition-fast);
 }
 
 .chat__select:focus {
   border-color: var(--purple-500);
+}
+
+.chat__join .btn {
+  width: 100%;
+  justify-content: center;
+  padding: 0.6rem 1rem;
+  font-size: 0.88rem;
+  box-sizing: border-box;
 }
 
 .chat__select option {
@@ -1220,27 +1248,15 @@ a:hover { color: var(--purple-300); }
   }
 }
 
-@media (max-width: 640px) {
-  .chat__join {
-    flex-direction: column;
-    gap: var(--space-xs);
-    padding: var(--space-sm);
-  }
-
+@media (max-width: 520px) {
   .chat__join-inputs {
     flex-direction: column;
-    width: 100%;
-    gap: var(--space-xs);
+    gap: 0.5rem;
   }
 
   .chat__select {
     max-width: 100%;
     width: 100%;
-  }
-
-  .chat__join .btn {
-    width: 100%;
-    justify-content: center;
   }
 
   .chat__form {
