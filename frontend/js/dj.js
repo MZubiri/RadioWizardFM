@@ -330,13 +330,17 @@
 
       const isLive = data.live?.is_live || false;
       const streamerName = data.live?.streamer_name || '';
+      const isOnline = Boolean(data.is_online ?? (data.now_playing?.song?.title && data.now_playing.song.title !== 'Station Offline'));
 
       if (isLive) {
         djStatusBadge.className = 'dj-status-badge dj-status-badge--live';
         djStatusBadge.textContent = `🔴 EN VIVO: ${streamerName || 'LOCUTOR'}`;
-      } else {
+      } else if (isOnline) {
         djStatusBadge.className = 'dj-status-badge dj-status-badge--autodj';
-        djStatusBadge.textContent = '🔮 AUTO-DJ ENCANTADO';
+        djStatusBadge.textContent = '🟢 EN LÍNEA (AutoDJ)';
+      } else {
+        djStatusBadge.className = 'dj-status-badge dj-status-badge--offline';
+        djStatusBadge.textContent = '⚫ FUERA DEL AIRE';
       }
 
       const song = data.now_playing?.song;

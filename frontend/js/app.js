@@ -152,6 +152,10 @@
     setPlayerState('playing');
     playerCard.classList.add('is-playing');
 
+    // If audio is actively playing, ensure badge reflects online status
+    const isDJLive = Boolean(nowPlayingData?.live?.is_live);
+    updateLiveBadge(isDJLive, true);
+
     // Start visualizer
     if (window.WizardVisualizer) {
       window.WizardVisualizer.start(audio);
@@ -339,7 +343,12 @@
     // Station & DJ state
     const isDJLive = Boolean(data.live?.is_live);
     const dj = data.live?.streamer_name || 'Locutor';
-    const isStationOnline = Boolean(data.is_online ?? data.station?.is_online);
+    const isStationOnline = Boolean(
+      data.is_online ??
+      data.station?.is_online ??
+      (data.now_playing?.song?.title && data.now_playing.song.title !== 'Station Offline') ??
+      isPlaying
+    );
 
     const wasLive = isLive;
     isLive = isDJLive;
@@ -371,10 +380,10 @@
     // Current song
     const song = data.now_playing?.song;
     if (song) {
-      if (isStationOnline && song.title && song.title !== 'Station Offline') {
+      if ((isStationOnline || isPlaying) && song.title && song.title !== 'Station Offline') {
         trackTitle.textContent = song.title;
         trackArtist.textContent = song.artist || 'WizardFM';
-      } else if (!isStationOnline && !isDJLive) {
+      } else if (!isStationOnline && !isDJLive && !isPlaying) {
         trackTitle.textContent = 'WizardFM';
         trackArtist.textContent = 'Transmisión Fuera del Aire';
       } else {
@@ -416,9 +425,9 @@
     if (isDJLive) {
       liveBadge.className = 'live-badge live-badge--on-air';
       liveBadgeText.textContent = '🔴 EN EL AIRE';
-    } else if (isStationOnline) {
+    } else if (isStationOnline || isPlaying) {
       liveBadge.className = 'live-badge live-badge--autodj';
-      liveBadgeText.textContent = 'RADIO ONLINE (AutoDJ)';
+      liveBadgeText.textContent = '🟢 EN LÍNEA';
     } else {
       liveBadge.className = 'live-badge live-badge--offline';
       liveBadgeText.textContent = 'FUERA DEL AIRE';
