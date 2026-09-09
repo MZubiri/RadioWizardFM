@@ -1,5 +1,5 @@
 /* ==========================================================================
-   WizardFM — DJ Panel Script
+   WizardFM — DJ Panel Script with Tabs & Schedule CRUD
    ========================================================================== */
 
 (() => {
@@ -17,20 +17,63 @@
   const djLechuzas = $('#dj-lechuzas');
   const djClearChatBtn = $('#dj-clear-chat-btn');
   const djClearStatus = $('#dj-clear-status');
-  const djScheduleList = $('#dj-schedule-list');
+
+  // CRUD Elements
+  const crudForm = $('#crud-show-form');
+  const crudFormTitle = $('#crud-form-title');
+  const crudShowId = $('#crud-show-id');
+  const crudName = $('#crud-name');
+  const crudDays = $('#crud-days');
+  const crudTime = $('#crud-time');
+  const crudHost = $('#crud-host');
+  const crudDesc = $('#crud-desc');
+  const crudSubmitBtn = $('#crud-submit-btn');
+  const crudCancelBtn = $('#crud-cancel-btn');
+  const crudStatusMsg = $('#crud-status-msg');
+  const crudShowsContainer = $('#crud-shows-container');
+  const crudCountBadge = $('#crud-count-badge');
 
   const API_NOWPLAYING = 'https://panel.wizardfm.lat/api/nowplaying/wizardfm';
   let chatSocket = null;
   let firstMessage = true;
+  let scheduleEvents = [];
 
   // --- Initialize ---
   function init() {
+    setupTabs();
     fetchStatus();
     setInterval(fetchStatus, 8000);
     connectChatListener();
     setupImportForm();
     setupClearChat();
-    fetchSchedule();
+    setupScheduleCrud();
+    loadCrudSchedule();
+  }
+
+  // --- Tab Navigation ---
+  function setupTabs() {
+    const tabBtns = document.querySelectorAll('.dj-tab-btn');
+    tabBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const targetTab = btn.getAttribute('data-tab');
+
+        tabBtns.forEach((b) => b.classList.remove('active'));
+        document.querySelectorAll('.dj-tab-content').forEach((content) => {
+          content.classList.remove('active');
+        });
+
+        btn.classList.add('active');
+        const activeContent = document.getElementById(targetTab);
+        if (activeContent) {
+          activeContent.classList.add('active');
+        }
+
+        // If switching to schedule, refresh it
+        if (targetTab === 'tab-programacion') {
+          loadCrudSchedule();
+        }
+      });
+    });
   }
 
   // --- Fetch Station Status ---
@@ -162,59 +205,189 @@
     });
   }
 
-  // --- Schedule Fetcher ---
-  async function fetchSchedule() {
-    if (!djScheduleList) return;
+  // --- Schedule CRUD Logic ---
+  function setupScheduleCrud() {
+    if (!crudForm) return;
+
+    // Form submit (Create or Update)
+    crudForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const id = crudShowId.value.trim();
+      const name = crudName.value.trim();
+      const days = crudDays.value.trim();
+      const time = crudTime.value.trim();
+      const host = crudHost.value.trim();
+      const desc = crudDesc.value.trim();
+
+      if (!name || !days || !time) return;
+
+      crudSubmitBtn.disabled = true;
+      crudSubmitBtn.textContent = 'Guardando... ✨';
+
+      const payload = { name, days, time, host, desc };
+      const isEditing = Boolean(id);
+      const url = isEditing ? `/api/schedule/${encodeURIComponent(id)}` : '/api/schedule';
+      const method = isEditing ? 'PUT' : 'POST';
+
+      try {
+        const res = await fetch(url, {
+          method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          showCrudStatus(`✨ Show ${isEditing ? 'actualizado' : 'creado'} con éxito.`, 'success');
+          resetCrudForm();
+          await loadCrudSchedule();
+        } else {
+          const errData = await res.json();
+          showCrudStatus(`⚠️ Error: ${errData.error || 'No se pudo guardar'}`, 'error');
+        }
+      } catch (err) {
+        showCrudStatus('⚠️ Error de conexión con el servidor.', 'error');
+      } finally {
+        crudSubmitBtn.disabled = false;
+        crudSubmitBtn.textContent = isEditing ? 'Actualizar Show ✨' : 'Guardar Show ✨';
+      }
+    });
+
+    // Cancel edit button
+    if (crudCancelBtn) {
+      crudCancelBtn.addEventListener('click', resetCrudForm);
+    }
+  }
+
+  async function loadCrudSchedule() {
+    if (!crudShowsContainer) return;
 
     try {
-      // 1. Try AzuraCast API schedule
       let shows = [];
-      try {
-        const azRes = await fetch('https://panel.wizardfm.lat/api/station/1/schedule');
-        if (azRes.ok) {
-          const azData = await azRes.json();
-          if (Array.isArray(azData) && azData.length > 0) {
-            shows = azData.map((item) => ({
-              days: item.start ? new Date(item.start).toLocaleDateString('es', { weekday: 'short' }).toUpperCase() : 'HORARIO',
-              time: item.start ? new Date(item.start).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }) : '00:00',
-              name: item.name || 'Emisión Especial',
-              host: item.type === 'streamer' ? 'Locutor en Vivo' : 'Playlist AutoDJ',
-            }));
-          }
-        }
-      } catch (e) {}
-
-      // 2. Fallback to schedule.json
-      if (shows.length === 0) {
-        const jsonRes = await fetch('/data/schedule.json');
-        if (jsonRes.ok) {
-          shows = await jsonRes.json();
-        }
+      const res = await fetch('/api/schedule');
+      if (res.ok) {
+        shows = await res.json();
+      } else {
+        const fallback = await fetch('/data/schedule.json');
+        if (fallback.ok) shows = await fallback.json();
       }
 
-      if (shows.length > 0) {
-        djScheduleList.innerHTML = shows
-          .map(
-            (s) => `
-          <div class="dj-schedule-item">
-            <div>
-              <strong style="color: #fff;">${escapeHtml(s.name)}</strong>
-              <div style="color: var(--text-muted); font-size: 0.75rem;">${escapeHtml(s.host || '')}</div>
-            </div>
-            <div style="text-align: right; color: var(--gold-400); font-weight: 600;">
-              <div>${escapeHtml(s.time)}</div>
-              <div style="font-size: 0.7rem; color: var(--text-muted);">${escapeHtml(s.days)}</div>
-            </div>
+      scheduleEvents = Array.isArray(shows) ? shows : [];
+      renderCrudSchedule(scheduleEvents);
+    } catch (e) {
+      crudShowsContainer.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 2rem;">Error al cargar la programación.</div>';
+    }
+  }
+
+  function renderCrudSchedule(shows) {
+    if (crudCountBadge) {
+      crudCountBadge.textContent = `${shows.length} ${shows.length === 1 ? 'show' : 'shows'}`;
+    }
+
+    if (shows.length === 0) {
+      crudShowsContainer.innerHTML = `
+        <div style="text-align: center; color: var(--text-muted); padding: 3rem 0;">
+          No hay shows registrados en la programación. Agrega el primero usando el formulario de la izquierda. ✨
+        </div>
+      `;
+      return;
+    }
+
+    crudShowsContainer.innerHTML = shows
+      .map(
+        (show) => `
+      <div class="crud-item" data-id="${escapeHtml(String(show.id))}">
+        <div class="crud-item__info">
+          <h3>${escapeHtml(show.name)}</h3>
+          ${show.desc ? `<p>${escapeHtml(show.desc)}</p>` : ''}
+          <div class="crud-item__meta">
+            <span class="crud-item__tag">📅 ${escapeHtml(show.days)}</span>
+            <span class="crud-item__tag">⏰ ${escapeHtml(show.time)}</span>
+            ${show.host ? `<span class="crud-item__tag">🎙️ ${escapeHtml(show.host)}</span>` : ''}
           </div>
-        `
-          )
-          .join('');
+        </div>
+        <div class="crud-item__actions">
+          <button type="button" class="btn btn--outline btn-icon edit-btn" title="Editar Show" data-id="${escapeHtml(String(show.id))}">
+            ✏️
+          </button>
+          <button type="button" class="btn btn--outline btn-icon delete-btn" title="Eliminar Show" data-id="${escapeHtml(String(show.id))}" style="border-color: #ef4444; color: #f87171;">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `
+      )
+      .join('');
+
+    // Attach Edit and Delete listeners
+    crudShowsContainer.querySelectorAll('.edit-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const show = scheduleEvents.find((s) => String(s.id) === String(id));
+        if (show) startEditShow(show);
+      });
+    });
+
+    crudShowsContainer.querySelectorAll('.delete-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        deleteShow(id);
+      });
+    });
+  }
+
+  function startEditShow(show) {
+    crudShowId.value = show.id;
+    crudName.value = show.name || '';
+    crudDays.value = show.days || '';
+    crudTime.value = show.time || '';
+    crudHost.value = show.host || '';
+    crudDesc.value = show.desc || '';
+
+    crudFormTitle.textContent = '✏️ Editar Show';
+    crudSubmitBtn.textContent = 'Actualizar Show ✨';
+    crudCancelBtn.style.display = 'inline-block';
+    crudName.focus();
+  }
+
+  function resetCrudForm() {
+    crudShowId.value = '';
+    crudForm.reset();
+    crudFormTitle.textContent = '✨ Agregar Nuevo Show';
+    crudSubmitBtn.textContent = 'Guardar Show ✨';
+    crudCancelBtn.style.display = 'none';
+  }
+
+  async function deleteShow(id) {
+    const confirmDelete = confirm('¿Estás seguro de que deseas eliminar este show de la programación?');
+    if (!confirmDelete) return;
+
+    try {
+      const res = await fetch(`/api/schedule/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+
+      if (res.ok) {
+        showCrudStatus('🗑️ Show eliminado correctamente.', 'success');
+        await loadCrudSchedule();
       } else {
-        djScheduleList.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 1rem;">No hay programas registrados.</div>';
+        showCrudStatus('⚠️ Error al eliminar el show.', 'error');
       }
     } catch (e) {
-      djScheduleList.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 1rem;">Error cargando programación.</div>';
+      showCrudStatus('⚠️ Error de conexión.', 'error');
     }
+  }
+
+  function showCrudStatus(msg, type) {
+    if (!crudStatusMsg) return;
+    crudStatusMsg.style.display = 'block';
+    crudStatusMsg.style.background = type === 'success' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)';
+    crudStatusMsg.style.border = type === 'success' ? '1px solid rgba(34, 197, 94, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)';
+    crudStatusMsg.style.color = type === 'success' ? '#4ade80' : '#f87171';
+    crudStatusMsg.textContent = msg;
+
+    setTimeout(() => {
+      crudStatusMsg.style.display = 'none';
+    }, 4000);
   }
 
   // --- Music Importer Form ---
